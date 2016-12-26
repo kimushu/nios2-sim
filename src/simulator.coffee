@@ -51,13 +51,14 @@ class Simulator
       return
     program.printWarn = (msg, verbosity = 0) ->
       return if verbosity > @verbose
-      process.stderr.write(colors.yellow("Warn: #{msg}\n"))
+      process.stderr.write(colors.yellow("Warning: #{msg}\n"))
       return
 
     program
       .usage("[options] <file>")
       .description("Altera NiosII program simulator")
       .option("-s, --sopcinfo <sopcinfo>", "Specify .sopcinfo file")
+      .option("--ignore-unknown", "Ignore unknown components")
       .option("-v, --verbose", "Increase verbosity", ((v, t) -> (t + 1)), 0)
       .parse(argv)
 
@@ -91,9 +92,14 @@ class Simulator
       xml = section.data
       options.printInfo("Loading system: (sopcinfo attached in executable)", 1)
       break
+    system = new Qsys(options)
     unless xml?
       printWarn("No sopcinfo loaded")
-      return Qsys.create(options)
-    return Qsys.load(xml, options)
+      return system.create().then(=>
+        return system
+      )
+    return system.load(xml).then(=>
+      return system
+    )
 
 module.exports = {Simulator}
