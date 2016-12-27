@@ -39,6 +39,7 @@ expandInterface = (obj) ->
 
 class Qsys
   constructor: (@options) ->
+    @connections = 0
     return
 
   load: (xml) ->
@@ -77,16 +78,54 @@ class Qsys
     ).then(=>
       @options.printInfo("Connecting components", 2)
       compo.connect() for path, compo of @components
+      @options.printInfo("#{@connections} connections loaded")
       return
     ) # return new Promise().then()...
 
-  createInterface: (compo, ifdesc) ->
+  loadInterface: (compo, ifdesc) ->
     kind = ifdesc.$.kind
     cls = @ifcatalog.lookup(kind)
     throw Error("No interface support for \"#{kind}\"") unless cls?
-    return new cls(compo)
+    result = new cls(compo, ifdesc, @options)
+    result.load(ifdesc)
+    return result
 
-class QsysInterface
-  null
+  deployImage: (image) ->
+    cpu_name = image.body?.sections.find(
+      (s) => s.name == ".cpu"
+    )?.data.toString()
+    if cpu_name?
+      cpu = @components[cpu_name]
+      throw Error(
+        "Processor \"#{cpu_name}\" is not found in this system"
+      ) unless cpu?.isProcessor
+    else
+      for n, c of @components
+        if c.isProcessor 
+          cpu = c
+          break
+      throw Error("No processor detected in this system") unless cpu?
+      @options.printWarn("No processor specified. Use \"#{cpu.name}\"")
+    @options.printInfo("Deploying executable image through processor \"#{cpu.name}\"", 1)
+    for p in image.body?.programs
+      continue if p.leng
+      if p.type == "load" or p.type == "lz4-load"
+        ba = p.paddr
+        ea = ba + p.memsz
+        hex8 = (v) -> ("0000000" + (v >>> 0).toString(16)).substr(-8)
+        @options.printInfo("Writing memory 0x#{hex8(ba)}-0x#{hex8(ea-1)}", 2)
+        cpu.deploy(ba, p.data) if p.filesz > 0
+        ba += p.filesz
+        zs = ea - ba
+        cpu.deploy(ba, Buffer.alloc(zs)) if zs > 0
+    cpu.cpu_reset()
+    run = =>
+      Promise.resolve(
+      ).then(=>
+        cpu.cpu_work()
+      ).then(=>
+        run()
+      )
+    return run()
 
-module.exports = {Qsys, QsysInterface}
+module.exports = {Qsys}

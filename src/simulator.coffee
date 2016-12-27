@@ -29,11 +29,13 @@ class Simulator
       return @loadSystem(image, options)
     ).then((result) =>
       system = result
+      # Deploy image to system
+      return system.deployImage(image)
     ).then(=>
       # Exit successfully
       process.exit(0)
     ).catch((reason) =>
-      options.printErr(reason)
+      process.stderr.write("#{colors.red(reason.stack)}\n")
       process.exit(1)
     )
     return
@@ -59,6 +61,7 @@ class Simulator
       .description("Altera NiosII program simulator")
       .option("-s, --sopcinfo <sopcinfo>", "Specify .sopcinfo file")
       .option("--ignore-unknown", "Ignore unknown components")
+      .option("--cpu-trace", "Show CPU trace")
       .option("-v, --verbose", "Increase verbosity", ((v, t) -> (t + 1)), 0)
       .parse(argv)
 
@@ -78,6 +81,7 @@ class Simulator
     options.printInfo("Loading executable: #{exec}", 1)
     elfy = require("elfy")
     elfy.constants.machine[113] ?= "altera_nios2"
+    elfy.constants.entryType[0x63700101] = "lz4-load"
     return elfy.parse(fs.readFileSync(exec))
 
   loadSystem: (image, options) ->
@@ -85,13 +89,12 @@ class Simulator
     if path?
       options.printInfo("Loading system: #{path}", 1)
       xml = fs.readFileSync(path)
-    for section in image.body?.sections or []
-      continue unless section.name == ".sopcinfo"
+    section = image.body?.sections.find((s) => s.name == ".sopcinfo")
+    if section?
       if options.sopcinfo?
         printWarn("sopcinfo embedded ELF image is ignored")
       xml = section.data
       options.printInfo("Loading system: (sopcinfo attached in executable)", 1)
-      break
     system = new Qsys(options)
     unless xml?
       printWarn("No sopcinfo loaded")

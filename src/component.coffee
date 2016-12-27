@@ -6,16 +6,20 @@ class Component
     return
 
   constructor: (@path, @system, @options) ->
+    @interfaces = {}
     return
 
   load: (module) ->
+    @name = module.$.name
     return Promise.resolve()
 
   connect: ->
     return
 
-  createInterface: (ifdesc) ->
-    return @system.createInterface(this, ifdesc)
+  loadInterface: (ifdesc) ->
+    i = @system.loadInterface(this, ifdesc)
+    @interfaces[i.name] = i
+    return i
 
 class ComponentCatalog
   constructor: (@options) ->
@@ -29,7 +33,10 @@ class ComponentCatalog
     return cls
 
 class DummyComponent extends Component
-  null
+  load: (module) ->
+    i = module.interface
+    @loadInterface(desc) for name, desc of i
+    return super(module)
 
 module.exports = {Component, ComponentCatalog, DummyComponent}
 

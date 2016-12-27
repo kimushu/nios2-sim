@@ -10,17 +10,20 @@ class MemoryDevice extends Component
     @options.printInfo("#{@path}: Memory device (#{@size} bytes)", 2)
     @writable ?= true
     @dualPort ?= false
-    @buffer = new ArrayBuffer(@size)
-    @u8  = new Uint8Array(@buffer)
-    @u16 = new Uint16Array(@buffer)
-    @u32 = new Uint32Array(@buffer)
-    @s1 = @createInterface(i.s1)
-    @s2 = @createInterface(i.s2) if @dualPort
+    @buffer = Buffer.alloc(@size)
+    @i8  = new Int8Array(@buffer)
+    @i16 = new Int16Array(@buffer)
+    @i32 = new Int32Array(@buffer)
+    @s1 = @loadInterface(i.s1)
+    @s2 = @loadInterface(i.s2) if @dualPort
     return super(module)
 
   connect: ->
     @s1.connect()
+    @s1.read32 = (offset, count) =>
+      @i32.subarray(offset, if count? then offset + count else undefined)
     @s2?.connect()
+    @s2?.read32 = @s1.read32
     return super()
 
 class AlteraAvalonOnchipMemory2 extends MemoryDevice
