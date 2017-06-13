@@ -1,10 +1,10 @@
 # Processors and Peripherals / Peripherals / *
 
-{Component} = require("./component")
+{Module} = require("./module")
 
-class AlteraAvalonTimer extends Component
+class AlteraAvalonTimer extends Module
   @kind: "altera_avalon_timer"
-  Component.register(this)
+  Module.register(this)
 
   load: (module) ->
     @loadInterface(module.interface.s1)

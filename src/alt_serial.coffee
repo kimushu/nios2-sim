@@ -1,10 +1,10 @@
 # Interface Protocols / Serial / *
 
-{Component} = require("./component")
+{Module} = require("./module")
 
-class AlteraAvalonUART extends Component
+class AlteraAvalonUART extends Module
   @kind: "altera_avalon_uart"
-  Component.register(this)
+  Module.register(this)
 
   load: (module) ->
     @loadInterface(module.interface.s1)

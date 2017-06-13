@@ -1,10 +1,10 @@
 # Basic Functions / Bridges and Adaptors / *
 
-{Component} = require("./component")
+{Module} = require("./module")
 
-class AlteraAvalonMMBridge extends Component
+class AlteraAvalonMMBridge extends Module
   @kind: "altera_avalon_mm_bridge"
-  Component.register(this)
+  Module.register(this)
 
   load: (module) ->
     i = module.interface

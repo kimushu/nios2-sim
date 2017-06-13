@@ -1,8 +1,8 @@
 # Basic Functions / Clocks; PLLs and Resets / Clock *
 
-{Component} = require("./component")
+{Module} = require("./module")
 
-class ClockSource extends Component
+class ClockSource extends Module
   @kind: "clock_source"
-  Component.register(this)
+  Module.register(this)
 

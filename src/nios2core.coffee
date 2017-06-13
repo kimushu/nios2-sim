@@ -1,3 +1,4 @@
+# NiosII core emulator
 
 list = {}
 
@@ -36,8 +37,15 @@ call_op = (iw, m, _this) ->
         (iw >>  6) & 0x7ff
       )
 
-exec  = (iw) -> call_op(iw, "exec", this)
-disas = (iw) -> call_op(iw, "disas", this)
+exports.exec  = (iw) -> call_op(iw, "exec", this)
+
+exports.disas = (iw) -> call_op(iw, "disas", this)
+
+exports.reset = () ->
+  @gpr = new Int32Array(32)
+  @gpr.fill(0xdeadbeef)
+  @gpr[0] = 0
+  return
 
 ZR = 0
 EA = 29
@@ -56,7 +64,6 @@ GPRN = {
   30: "ba"  # TODO
   31: "ra"
 }
-
 GPRN[i] ?= "r#{i}" for i in [0...32]
 
 CTRN = {
@@ -76,11 +83,11 @@ CTRN = {
   14: "mpubase"
   15: "mpuacc"
 }
-
 CTRN[i] ?= "ctl#{i}" for i in [0...32]
 
 HEX8 = (v) -> "0x" + ("0000000" + (v >>> 0).toString(16)).substr(-8)
 SE16 = (v) -> (v << 16) >> 16
+SE8  = (v) -> (v << 24) >> 24
 
 D_N   = (m)           -> "#{m}\t"
 D_D   = (m, v)        -> "#{m}\t#{v}"
@@ -101,7 +108,7 @@ def(0x00, TYPE_J,
     @gpr[RA] = @pc + 4
     return u26 << 2
   (u26) ->
-    return D_H("call", u26)
+    return D_H("call", u26 << 2)
 )
 
 # jmpi
@@ -109,7 +116,7 @@ def(0x01, TYPE_J,
   (u26) ->
     return u26 << 2
   (u26) ->
-    return D_H("jmpi", u26)
+    return D_H("jmpi", u26 << 2)
 )
 
 # 0x02 - no instruction
@@ -120,7 +127,7 @@ def(0x03, TYPE_I,
     @gpr[rb] = @dread8(@gpr[ra] + s16)
     return
   (ra, rb, s16) ->
-    return D_ROR("ldbu", rc, s16, ra)
+    return D_ROR("ldbu", rb, s16, ra)
 )
 
 # addi
@@ -139,7 +146,7 @@ def(0x05, TYPE_I,
     @dwrite8(@gpr[ra] + s16, @gpr[rb])
     return
   (ra, rb, s16) ->
-    return D_ROR("stb", rc, s16, ra)
+    return D_ROR("stb", rb, s16, ra)
 )
 
 # br
@@ -156,7 +163,7 @@ def(0x07, TYPE_I,
     @gpr[rb] = SE8(@dread8(@gpr[ra] + s16))
     return
   (ra, rb, s16) ->
-    return D_ROR("ldb", rc, s16, ra)
+    return D_ROR("ldb", rb, s16, ra)
 )
 
 # cmpgei
@@ -178,13 +185,14 @@ def(0x0b, TYPE_I,
     @gpr[rb] = @dread16(@gpr[ra] + s16)
     return
   (ra, rb, s16) ->
-    return D_ROR("ldhu", rc, s16, ra)
+    return D_ROR("ldhu", rb, s16, ra)
 )
 
 # andi
 def(0x0c, TYPE_I,
   (ra, rb, s16) ->
     @gpr[rb] = @gpr[ra] & (s16 & 0xffff)
+    return
   (ra, rb, s16) ->
     return D_RRD("andi", rb, ra, s16 & 0xffff)
 )
@@ -195,7 +203,7 @@ def(0x0d, TYPE_I,
     @dwrite16(@gpr[ra] + s16, @gpr[rb])
     return
   (ra, rb, s16) ->
-    return D_ROR("sth", rc, s16, ra)
+    return D_ROR("sth", rb, s16, ra)
 )
 
 # bge
@@ -213,7 +221,7 @@ def(0x0f, TYPE_I,
     @gpr[rb] = SE16(@dread16(@gpr[ra] + s16))
     return
   (ra, rb, s16) ->
-    return D_ROR("ldh", rc, s16, ra)
+    return D_ROR("ldh", rb, s16, ra)
 )
 
 # cmplti
@@ -966,6 +974,4 @@ def(0x3b3a, TYPE_R,
 # 0x3e3a - no instruction
 
 # 0x3f3a - no instruction
-
-module.exports = {exec, disas}
 

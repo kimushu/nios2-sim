@@ -30,7 +30,7 @@ class Simulator
     ).then((result) =>
       system = result
       # Deploy image to system
-      return system.deployImage(image)
+      return system.loadImage(image)
     ).then(=>
       # Exit successfully
       process.exit(0)
@@ -98,7 +98,7 @@ class Simulator
     system = new Qsys(options)
     unless xml?
       printWarn("No sopcinfo loaded")
-      return system.create().then(=>
+      return system.create(image).then(=>
         return system
       )
     return system.load(xml).then(=>

@@ -1,39 +1,33 @@
-Promise = require("es6-promise")
-
-class Interface
-  @catalog: {}
+Interface = class exports.Interface
+  @subclasses: {}
 
   @register: (subclass) ->
-    @catalog[subclass.kind] = subclass
+    @subclasses[subclass.kind] = subclass
 
-  constructor: (@component, @options) ->
-    @system = @component.system
+  @search: (kind) ->
+    return @subclasses[kind]
+
+  constructor: (@module, @options) ->
+    @system = @module.system
     return
 
-  load: (ifdesc) ->
-    @name = ifdesc.$.name
+  load: (ifc) ->
+    @name = ifc.name
     return
 
   connect: ->
     return
 
-class InterfaceCatalog
-  constructor: (@options) ->
-    return
-
-  lookup: (kind) ->
-    return Interface.catalog[kind]
-
-class AvalonMaster extends Interface
+class exports.AvalonMaster extends Interface
   @kind: "avalon_master"
   Interface.register(this)
 
-  load: (ifdesc) ->
+  load: (ifc) ->
     @slaves = []
-    for blk in ifdesc.memoryBlock
+    for blk in ifc.memoryBlock
       s = {
-        bridge: (blk.isBridge[0] == "true")
-        component: blk.moduleName[0]
+        bridge: (blk.isBridge?[0] == "true")
+        module: blk.moduleName[0]
         interface: blk.slaveName[0]
         link: null
         base: parseInt(blk.baseAddress[0])
@@ -42,17 +36,18 @@ class AvalonMaster extends Interface
       s.end = s.base + s.size
       @slaves.push(s)
     @slaves.sort((a, b) => a.base - b.base)
-    return super(ifdesc)
+    return super(ifc)
 
   connect: ->
     for s in @slaves
-      s.link = @system.components[s.component]?.
-        interfaces?[s.interface]
+      target = @module.system.modules[s.module]
+      @options.printInfo("Connecting: #{@module.path}.#{@name}" +
+        " => #{target.path}.#{s.interface}", 3)
+      s.link = target?.interfaces[s.interface]
       throw Error(
-        "No target slave (#{s.component}.#{s.interface}) in this system"
+        "No target slave (#{s.module}.#{s.interface}) in this system"
       ) unless s.link?
       s.link.master.link = this
-      @system.connections += 1
     return
 
   getSlave: (addr) ->
@@ -71,7 +66,7 @@ class AvalonMaster extends Interface
 
   read8: (addr, count) ->
     s = @getSlave(addr)
-    return s?.link.read8(addr - s.base, count)
+    return s?.link.read8((addr - s.base) >> 0, count)
 
   read16: (addr, count) ->
     s = @getSlave(addr)
@@ -82,30 +77,24 @@ class AvalonMaster extends Interface
     return s?.link.read32((addr - s.base) >> 2, count)
 
   write8: (addr, array) ->
-    u8 = @read8(addr, array.length)
-    return false unless u8?
-    u8.set(array)
-    return true
+    s = @getSlave(addr)
+    return s?.link.write8((addr - s.base) >> 0, array)
 
   write16: (addr, array) ->
-    u16 = @read16(addr, array.length)
-    return false unless u16?
-    u16.set(array)
-    return true
+    s = @getSlave(addr)
+    return s?.link.write16((addr - s.base) >> 1, array)
 
   write32: (addr, array) ->
-    i32 = @read32(addr, array.length)
-    return false unless i32?
-    i32.set(array)
-    return true
+    s = @getSlave(addr)
+    return s?.link.write32((addr - s.base) >> 2, array)
 
-class AvalonSlave extends Interface
+class exports.AvalonSlave extends Interface
   @kind: "avalon_slave"
   Interface.register(this)
 
-  load: (ifdesc) ->
+  load: (ifc) ->
     @master = {link: null}
-    return super(ifdesc)
+    return super(ifc)
 
   read8: (offset, count) ->
     boff = offset & 3
@@ -113,6 +102,9 @@ class AvalonSlave extends Interface
     cnt32 = (boff + count + 3) >>> 2
     i32 = @read32(off32, cnt32)
     return unless i32?
+    return i32.then((_i32) =>
+      return new Int8Array(_i32.buffer, _i32.byteOffset + boff, count)
+    ) if i32.then?
     return new Int8Array(i32.buffer, i32.byteOffset + boff, count)
 
   read16: (offset, count) ->
@@ -121,65 +113,70 @@ class AvalonSlave extends Interface
     cnt32 = (woff + count + 1) >> 1
     i32 = @read32(off32, cnt32)
     return unless i32?
+    return i32.then((_i32) =>
+      return new Int16Array(_i32.buffer, _i32.byteOffset + woff * 2, count * 2)
+    ) if i32.then?
     return new Int16Array(i32.buffer, i32.byteOffset + woff * 2, count * 2)
 
   write8: (offset, array) ->
     u8 = @read8(offset, array.length)
     return false unless u8?
+    throw Error(
+      "Asynchronous writer (write8) is not defined"
+    ) if u8.then?
     u8.set(array)
     return true
 
   write16: (offset, array) ->
     u16 = @read16(offset, array.length)
     return false unless u16?
+    throw Error(
+      "Asynchronous writer (write16) is not defined"
+    ) if u16.then?
     u16.set(array)
     return true
 
   write32: (offset, array) ->
     i32 = @read32(offset, array.length)
     return false unless i32?
+    throw Error(
+      "Asynchronous writer (write32) is not defined"
+    ) if i32.then?
     i32.set(array)
     return true
 
-class AvalonSink extends Interface
+class exports.AvalonSink extends Interface
   @kind: "avalon_streaming_sink"
   Interface.register(this)
 
-class AvalonSource extends Interface
+class exports.AvalonSource extends Interface
   @kind: "avalon_streaming_source"
   Interface.register(this)
 
-class ClockSink extends Interface
+class exports.ClockSink extends Interface
   @kind: "clock_sink"
   Interface.register(this)
 
-class ClockSource extends Interface
+class exports.ClockSource extends Interface
   @kind: "clock_source"
   Interface.register(this)
 
-class Conduit extends Interface
+class exports.Conduit extends Interface
   @kind: "conduit_end"
   Interface.register(this)
 
-class InterruptSender extends Interface
+class exports.InterruptSender extends Interface
   @kind: "interrupt_sender"
   Interface.register(this)
 
-class NiosCustomInstructionMaster extends Interface
+class exports.NiosCustomInstructionMaster extends Interface
   @kind: "nios_custom_instruction_master"
   Interface.register(this)
 
-class ResetSink extends Interface
+class exports.ResetSink extends Interface
   @kind: "reset_sink"
   Interface.register(this)
 
-class ResetSource extends Interface
+class exports.ResetSource extends Interface
   @kind: "reset_source"
   Interface.register(this)
-
-module.exports = {
-  Interface, InterfaceCatalog,
-  AvalonMaster, AvalonSlave, AvalonSink, AvalonSource,
-  ClockSink, ClockSource, Conduit, NiosCustomInstructionMaster,
-  ResetSink, ResetSource
-}
