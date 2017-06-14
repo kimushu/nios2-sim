@@ -1,35 +1,38 @@
 {
-  "name": "nios2-simulator",
-  "version": "1.0.0",
-  "description": "NiosII simulator",
-  "main": "index.js",
-  "scripts": {
-    "test": "mocha",
-    "pretest": "npm run compile",
-    "prepublish": "npm run compile",
-    "compile": "coffee --compile --output lib/ src/"
-  },
-  "bin": {
-    "nios2-simulator": "bin/nios2-simulator"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kimushu/nios2-simulator.git"
-  },
-  "author": "kimu_shu",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/kimushu/nios2-simulator/issues"
-  },
-  "homepage": "https://github.com/kimushu/nios2-simulator#readme",
-  "devDependencies": {
-    "coffee-script": "^1.12.2"
-  },
-  "dependencies": {
-    "colors": "^1.1.2",
-    "commander": "^2.9.0",
-    "elfy": "^0.1.0",
-    "es6-promise": "^4.0.5",
-    "xml2js": "^0.4.17"
-  }
+    "name": "nios2-sim",
+    "version": "1.0.0",
+    "description": "NiosII simulator",
+    "main": "index.js",
+    "scripts": {
+        "test": "mocha",
+        "pretest": "npm run compile",
+        "prepublish": "npm run compile",
+        "compile": "coffee --compile --output lib/ src/"
+    },
+    "bin": {
+        "nios2-sim": "bin/nios2-sim"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kimushu/nios2-sim.git"
+    },
+    "author": "kimu_shu",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/kimushu/nios2-sim/issues"
+    },
+    "homepage": "https://github.com/kimushu/nios2-sim#readme",
+    "devDependencies": {
+        "@types/node": "^7.0.31",
+        "@types/xml2js": "0.0.33",
+        "tslint": "^5.4.3",
+        "typescript": "^2.3.4"
+    },
+    "dependencies": {
+        "colors": "^1.1.2",
+        "commander": "^2.9.0",
+        "dedent": "^0.7.0",
+        "elfy": "^0.1.0",
+        "xml2js": "^0.4.17"
+    }
 }

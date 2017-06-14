@@ -1,0 +1,1 @@
+@node .\nios2-simulator %*
