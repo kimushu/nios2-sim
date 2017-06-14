@@ -1,0 +1,25 @@
+{
+    // 使用できる Node.js デバッグ属性を学ぶために、インテリセンスを使用してください。
+    // 既存の属性の説明をホバーして表示します。
+    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "プログラムの起動",
+            "args": [
+                "${workspaceRoot}/bin/nios2-sim",
+                "${workspaceRoot}/test/olive_rubic_duktape.elf",
+                "--ignore-unknown",
+                "--cpu-trace",
+                "-vvv"
+            ],
+            "outFiles": [
+                "${workspaceRoot}/lib/**/*.js"
+            ],
+            "sourceMaps": true,
+            "preLaunchTask": "tsc"
+        }
+    ]
+}

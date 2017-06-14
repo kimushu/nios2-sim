@@ -2,37 +2,96 @@ import * as fs from "fs";
 import * as colors from "colors";
 import { Qsys } from "./qsys";
 
-function printErr(msg: string) {
-    return process.stderr.write(colors.red("Error: " + msg) + "\n");
+export interface SimulatorOptions {
+    sopcinfo: string;
+    ignoreUnknown: boolean;
+    cpuTrace: boolean;
+    noPlugin: boolean;
+    verbose: number;
+    args: string[];
+    printInfo: (message: string, verbosity?: number) => void;
+    printWarn: (message: string, verbosity?: number) => void;
+    printErr: (message: string, verbosity?: number) => void;
 }
 
-function printWarn(msg: string) {
-    return process.stderr.write(colors.yellow("Warning: " + msg) + "\n");
+export interface ElfImage {
+    class: string;
+    endian: string;
+    version: number;
+    osabi: string;
+    abiversion: string;
+    type: string;
+    machine: string;
+    entry: number;
+    phoff: number;
+    shoff: number;
+    flags: number;
+    ehsize: number;
+    phentsize: number;
+    phnum: number;
+    shentsize: number;
+    shnum: number;
+    shstrndx: number;
+    body: {
+        programs: {
+            type: string;
+            offset: number;
+            vaddr: number;
+            paddr: number;
+            filesz: number;
+            memsz: number;
+            flags: any;
+            align: number;
+            data: Buffer;
+        }[];
+        sections: {
+            name: string;
+            type: string;
+            flags: any;
+            addr: number;
+            off: number;
+            size: number;
+            link: number;
+            info: number;
+            addralign: number;
+            entsize: number;
+            data: Buffer;
+        }[];
+    };
 }
 
 export class Simulator {
+    public system: Qsys;
+    public options: SimulatorOptions;
+    public image: ElfImage;
+
     constructor() {
     }
 
     run(argv: string[]) {
-        var image, options, system;
-        options = null;
-        image = null;
-        system = null;
         return Promise.resolve().then(() => {
             return this.parseOptions(argv);
         })
-        .then((result) => {
-            options = result;
-            return this.loadExecutable(options.args[0], options);
+        .then(() => {
+            return this.loadExecutable(this.options.args[0]);
         })
-        .then((result) => {
-            image = result;
-            return this.loadSystem(image, options);
+        .then(() => {
+            return this.loadSystem();
         })
-        .then((result) => {
-            system = result;
-            return system.loadImage(image);
+        .then(() => {
+            return this.system.loadImage(this.image);
+        })
+        .then(() => {
+            return this.system.cpu.resetProcessor();
+        })
+        .then(() => {
+            let run = () => {
+                this.system.cpu.runProcessor()
+                .then(() => {
+                    return run();
+                });
+            };
+            return run();
         })
         .then(() => {
             return process.exit(0);
@@ -43,34 +102,22 @@ export class Simulator {
         });
     }
 
-    parseOptions(argv: string[]) {
+    parseOptions(argv: string[]): void {
         const program = require("commander");
-        program.printInfo = function (msg, verbosity) {
-            if (verbosity == null) {
-                verbosity = 0;
+        program.printInfo = function (msg: string, verbosity: number = 0) {
+            if (verbosity <= this.verbose) {
+                process.stderr.write(colors.cyan(`Info: ${msg}\n`));
             }
-            if (verbosity > this.verbose) {
-                return;
-            }
-            process.stderr.write(colors.cyan("Info: " + msg + "\n"));
         };
-        program.printErr = function (msg, verbosity) {
-            if (verbosity == null) {
-                verbosity = 0;
+        program.printErr = function (msg: string, verbosity: number = 0) {
+            if (verbosity <= this.verbose) {
+                process.stderr.write(colors.red(`Error: ${msg}\n`));
             }
-            if (verbosity > this.verbose) {
-                return;
-            }
-            process.stderr.write(colors.red("Error: " + msg + "\n"));
         };
-        program.printWarn = function (msg, verbosity) {
-            if (verbosity == null) {
-                verbosity = 0;
+        program.printWarn = function (msg: string, verbosity: number = 0) {
+            if (verbosity <= this.verbose) {
+                process.stderr.write(colors.yellow(`Warning: ${msg}\n`));
             }
-            if (verbosity > this.verbose) {
-                return;
-            }
-            process.stderr.write(colors.yellow("Warning: " + msg + "\n"));
         };
         program
         .usage("[options] <file>")
@@ -90,39 +137,41 @@ export class Simulator {
             program.outputHelp();
             process.exit(1);
         }
-        return program;
+        if (program.verbose == null) {
+            program.verbose = 0;
+        }
+        this.options = program;
     }
 
-    loadExecutable(exec, options) {
-        options.printInfo("Loading executable: " + exec, 1);
+    loadExecutable(exec: string): void {
+        this.options.printInfo(`Loading executable: ${exec}`, 1);
         const elfy = require("elfy");
         elfy.constants.machine[113] = "altera_nios2";
         elfy.constants.entryType[0x63700101] = "lz4-load";
-        return elfy.parse(fs.readFileSync(exec));
+        this.image = elfy.parse(fs.readFileSync(exec));
     }
 
-    loadSystem(image, options) {
-        let path, ref, section, system, xml;
-        path = options.sopcinfo;
+    loadSystem(): Promise<void> {
+        let xml: Buffer;
+        let path = this.options.sopcinfo;
         if (path != null) {
-            options.printInfo("Loading system: " + path, 1);
+            this.options.printInfo(`Loading system: ${path}`, 1);
             xml = fs.readFileSync(path);
-        }
-        if (image.body != null) {
-            section = image.body.find((section) => section.name === ".sopcinfo");
-        }
-        if (section != null) {
-            if (options.sopcinfo != null) {
-                printWarn("sopcinfo embedded ELF image is ignored");
+        } else {
+            let section = this.image.body.sections.find((section) => section.name === ".sopcinfo");
+            if (section != null) {
+                if (this.options.sopcinfo != null) {
+                    this.options.printWarn("sopcinfo embedded ELF image is ignored");
+                }
+                xml = section.data;
+                this.options.printInfo("Loading system: (sopcinfo attached in executable)", 1);
             }
-            xml = section.data;
-            options.printInfo("Loading system: (sopcinfo attached in executable)", 1);
         }
-        system = new Qsys(options);
+        this.system = new Qsys(this.options);
         if (xml == null) {
-            printWarn("No sopcinfo loaded");
-            return system.create(image).then(() => system);
+            this.options.printWarn("No sopcinfo loaded");
+            return this.system.create(this.image);
         }
-        return system.load(xml).then(() => system);
+        return this.system.load(xml);
     }
 }

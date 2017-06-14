@@ -1,10 +1,16 @@
-interface InterfaceConstructor extends Function {
+import { Module } from "./module";
+import { SimulatorOptions } from "./simulator";
+import { Qsys } from "./qsys";
+import { SopcInfoInterface } from "./sopcinfo";
+import { then, Promiseable } from "./promiseable";
+
+export interface InterfaceConstructor extends Function {
     readonly kind: string;
-    new(module, options): Interface;
+    new(module: Module, options: SimulatorOptions): Interface;
 }
 
 export class Interface {
-    static subclasses: {[key: string]: InterfaceConstructor} = {};
+    static subclasses: {[kind: string]: InterfaceConstructor} = {};
 
     static register(subclass: InterfaceConstructor): void {
         this.subclasses[subclass.kind] = subclass;
@@ -14,54 +20,62 @@ export class Interface {
         return this.subclasses[kind];
     }
 
-    public system;
+    public system: Qsys;
     public name: string;
 
-    constructor(public module, public options) {
+    constructor(public module: Module, public options: SimulatorOptions) {
         this.system = this.module.system;
         return;
     }
 
-    load(ifc) {
-        this.name = ifc.name;
+    load(ifdesc: SopcInfoInterface): void {
+        this.name = ifdesc.name;
     }
 
-    connect() {
+    connect(): void {
     }
+}
+
+interface SlaveLink {
+    bridge: boolean;
+    module: string;
+    interface: string;
+    link: AvalonSlave;
+    base: number;
+    size: number;
+    end: number;
 }
 
 export class AvalonMaster extends Interface {
     static kind = "avalon_master";
-    public slaves = [];
+    private slaves: SlaveLink[];
 
-    load(ifc) {
-        var blk, i, len, ref, ref1, s;
+    load(ifdesc: SopcInfoInterface): void {
         this.slaves = [];
-        ref = ifc.memoryBlock;
-        for (i = 0, len = ref.length; i < len; i++) {
-            blk = ref[i];
-            s = {
-                bridge: ((ref1 = blk.isBridge) != null ? ref1[0] : void 0) === "true",
-                module: blk.moduleName[0],
-                "interface": blk.slaveName[0],
+        for (let blk of ifdesc.memoryBlock) {
+            let slave: SlaveLink = {
+                bridge: blk.isBridge === "true",
+                module: blk.moduleName,
+                interface: blk.slaveName,
                 link: null,
-                base: parseInt(blk.baseAddress[0]),
-                size: parseInt(blk.span[0])
+                base: parseInt(blk.baseAddress),
+                size: parseInt(blk.span),
+                end: null
             };
-            s.end = s.base + s.size;
-            this.slaves.push(s);
+            slave.end = slave.base + slave.size;
+            this.slaves.push(slave);
         }
         this.slaves.sort((a, b) => a.base - b.base);
-        return Interface.prototype.load.call(this, ifc);
+        return Interface.prototype.load.call(this, ifdesc);
     }
 
-    connect() {
-        var i, len, ref, s, target;
+    connect(): void {
+        var i, len, ref, s;
         ref = this.slaves;
         for (i = 0, len = ref.length; i < len; i++) {
             s = ref[i];
-            target = this.module.system.modules[s.module];
-            this.options.printInfo(("Connecting: " + this.module.path + "." + this.name) + (" => " + target.path + "." + s["interface"]), 3);
+            let target = this.module.system.modules[s.module];
+            this.options.printInfo(`Connecting: ${this.module.path}.${this.name} => ${target.path}.${s.interface}`, 3);
             s.link = target != null ? target.interfaces[s["interface"]] : void 0;
             if (s.link == null) {
                 throw Error("No target slave (" + s.module + "." + s["interface"] + ") in this system");
@@ -70,155 +84,123 @@ export class AvalonMaster extends Interface {
         }
     }
 
-    getSlave(addr) {
-        var btm, mid, s, top;
-        top = 0;
-        btm = this.slaves.length;
+    private _getSlave(addr: number): SlaveLink {
+        let top: number = 0;
+        let btm: number = this.slaves.length;
         while (top < btm) {
-            mid = (top + btm) >>> 1;
-            s = this.slaves[mid];
-            if (addr < s.base) {
+            let mid = (top + btm) >>> 1;
+            let slave = this.slaves[mid];
+            if (addr < slave.base) {
                 btm = mid;
-            } else if (addr >= s.end) {
+            } else if (addr >= slave.end) {
                 top = mid + 1;
             } else {
-                return s;
+                return slave;
             }
         }
     }
 
-    read8(addr: number, count: number) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.read8((addr - s.base) >> 0, count) : void 0;
+    read8(addr: number, bytes?: number): Promiseable<Int8Array> {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            return s.link.read8((addr - s.base) >>> 0, bytes);
+        }
     }
 
-    read16(addr: number, count: number) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.read16((addr - s.base) >> 1, count) : void 0;
+    read16(addr: number, bytes?: number): Promiseable<Int16Array> {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            return s.link.read16((addr - s.base) >>> 1, bytes);
+        }
     }
 
-    read32(addr: number, count: number) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.read32((addr - s.base) >> 2, count) : void 0;
+    read32(addr: number, bytes?: number): Promiseable<Int32Array> {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            console.log(addr, s.link.name, s.link.module.name);
+            return s.link.read32((addr - s.base) >>> 2, bytes);
+        }
     }
 
-    write8(addr: number, array) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.write8((addr - s.base) >> 0, array) : void 0;
+    write8(addr: number, array: Int8Array) {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            return s.link.write8((addr - s.base) >>> 0, array);
+        }
     }
 
-    write16(addr: number, array) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.write16((addr - s.base) >> 1, array) : void 0;
+    write16(addr: number, array: Int16Array) {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            return s.link.write16((addr - s.base) >>> 1, array);
+        }
     }
 
-    write32(addr: number, array) {
-        var s;
-        s = this.getSlave(addr);
-        return s != null ? s.link.write32((addr - s.base) >> 2, array) : void 0;
+    write32(addr: number, array: Int32Array) {
+        let s = this._getSlave(addr);
+        if (s != null) {
+            return s.link.write32((addr - s.base) >>> 2, array);
+        }
     }
 }
 Interface.register(AvalonMaster);
 
+interface MasterLink {
+    link: AvalonMaster;
+}
+
 export class AvalonSlave extends Interface {
-    /*constructor(module, options) {
-        super(module, options);
-    }*/
-
     static kind = "avalon_slave";
-    public master;
+    private master: MasterLink;
 
-    load(ifc) {
+    load(ifc): void {
         this.master = {
             link: null
         };
         return Interface.prototype.load.call(this, ifc);
     }
 
-    read8(offset: number, count: number): Int8Array | Promise<Int8Array> {
-        var boff, cnt32, i32, off32;
-        boff = offset & 3;
-        off32 = offset >>> 2;
-        cnt32 = (boff + count + 3) >>> 2;
-        i32 = this.read32(off32, cnt32);
-        if (i32 == null) {
-            return;
-        }
-        if (i32.then != null) {
-            return i32.then((function (_this) {
-                return function (_i32) {
-                    return new Int8Array(_i32.buffer, _i32.byteOffset + boff, count);
-                };
-            })(this));
-        }
-        return new Int8Array(i32.buffer, i32.byteOffset + boff, count);
+    read8(offset: number, bytes?: number): Promiseable<Int8Array> {
+        let boff = offset & 3;
+        let off32 = offset >>> 2;
+        let cnt32 = (bytes != null) ? ((boff + bytes + 3) >>> 2): null;
+        return then(
+            this.read32(off32, cnt32),
+            (i32) => new Int8Array(i32.buffer, i32.byteOffset + boff, i32.byteLength - boff)
+        );
     }
 
-    read16(offset: number, count: number): Int16Array | Promise<Int16Array> {
-        var cnt32, i32, off32, woff;
-        woff = offset & 1;
-        off32 = offset >> 1;
-        cnt32 = (woff + count + 1) >> 1;
-        i32 = this.read32(off32, cnt32);
-        if (i32 == null) {
-            return;
-        }
-        if (i32.then != null) {
-            return i32.then((function (_this) {
-                return function (_i32) {
-                    return new Int16Array(_i32.buffer, _i32.byteOffset + woff * 2, count * 2);
-                };
-            })(this));
-        }
-        return new Int16Array(i32.buffer, i32.byteOffset + woff * 2, count * 2);
+    read16(offset: number, bytes?: number): Promiseable<Int16Array> {
+        let woff = offset & 1;
+        let off32 = offset >> 1;
+        let cnt32 = (bytes != null) ? ((woff + bytes + 1) >>> 1) : null;
+        return then(
+            this.read32(off32, cnt32),
+            (i32) => new Int16Array(i32.buffer, i32.byteOffset + woff * 2, i32.byteLength - woff * 2)
+        );
     }
 
-    read32(offset: number, count: number): Int32Array | Promise<Int32Array> {
-        throw new Error("Not implemented");
+    read32: (this: AvalonSlave, offset: number, bytes?: number) => Promiseable<Int32Array>;
+
+    write8(offset: number, array: Int8Array): Promiseable<boolean> {
+        return then(
+            this.read8(offset, array.length),
+            (i8) => i8.set(array) || true
+        );
     }
 
-    write8(offset: number, array) {
-        var u8;
-        u8 = this.read8(offset, array.length);
-        if (u8 == null) {
-            return false;
-        }
-        if (u8.then != null) {
-            throw Error("Asynchronous writer (write8) is not defined");
-        }
-        u8.set(array);
-        return true;
+    write16(offset: number, array: Int16Array): Promiseable<boolean> {
+        return then(
+            this.read16(offset, array.length),
+            (i16) => i16.set(array) || true
+        );
     }
 
-    write16(offset: number, array) {
-        var u16;
-        u16 = this.read16(offset, array.length);
-        if (u16 == null) {
-            return false;
-        }
-        if (u16.then != null) {
-            throw Error("Asynchronous writer (write16) is not defined");
-        }
-        u16.set(array);
-        return true;
-    }
-
-    write32(offset: number, array) {
-        var i32;
-        i32 = this.read32(offset, array.length);
-        if (i32 == null) {
-            return false;
-        }
-        if (i32.then != null) {
-            throw Error("Asynchronous writer (write32) is not defined");
-        }
-        i32.set(array);
-        return true;
+    write32(offset: number, array: Int32Array): Promiseable<boolean> {
+        return then(
+            this.read32(offset, array.length),
+            (i32) => i32.set(array) || true
+        );
     }
 }
 Interface.register(AvalonSlave);

@@ -1,5 +1,6 @@
 import { Module } from "./module";
-import { AvalonSlave } from "./interface";
+import { AvalonSlave, Interface } from "./interface";
+import { SopcInfoModule } from "./sopcinfo";
 
 class MemoryDevice extends Module {
     public size: number;
@@ -10,10 +11,9 @@ class MemoryDevice extends Module {
     public s1: AvalonSlave;
     public s2: AvalonSlave;
 
-    load(module) {
-        var i, p;
-        p = module.parameter;
-        i = module["interface"];
+    load(moddesc: SopcInfoModule): Promise<void> {
+        let p = moddesc.parameter;
+        let i = moddesc.interface;
         this.options.printInfo(`[${this.path}] Memory device (${this.size} bytes)`, 2);
         if (this.writable == null) {
             this.writable = true;
@@ -23,22 +23,25 @@ class MemoryDevice extends Module {
         }
         this.buffer = new ArrayBuffer(this.size);
         this.i32 = new Int32Array(this.buffer);
-        this.s1 = <AvalonSlave>this.loadInterface(i.s1);
-        if (this.dualPort) {
-            this.s2 = <AvalonSlave>this.loadInterface(i.s2);
+        function requireAvalonSlave(i: Interface): AvalonSlave {
+            if (i instanceof AvalonSlave) {
+                return i;
+            }
+            throw new Error(`slave "${i.name}" is not AvalonSlave interface`);
         }
-        return Module.prototype.load.call(this, module);
+        this.s1 = requireAvalonSlave(this.loadInterface(i.s1));
+        if (this.dualPort) {
+            this.s2 = requireAvalonSlave(this.loadInterface(i.s2));
+        }
+        return Module.prototype.load.call(this, moddesc);
     }
 
-    connect() {
-        var ref;
-        this.s1.read32 = (function (_this) {
-            return function (offset, count) {
-                return _this.i32.subarray(offset, count != null ? offset + count : void 0);
-            };
-        })(this);
-        if ((ref = this.s2) != null) {
-            ref.read32 = this.s1.read32;
+    connect(): void {
+        this.s1.read32 = (offset: number, count?: number) => {
+            return this.i32.subarray(offset, (count != null) ? (offset + count) : undefined);
+        };
+        if (this.s2 != null) {
+            this.s2.read32 = this.s1.read32;
         }
         return Module.prototype.connect.call(this);
     }
@@ -47,13 +50,13 @@ class MemoryDevice extends Module {
 class AlteraAvalonOnchipMemory2 extends MemoryDevice {
     static kind = "altera_avalon_onchip_memory2";
 
-    load(module) {
+    load(moddesc: SopcInfoModule): Promise<void> {
         var p, ref;
-        p = module.parameter;
+        p = moddesc.parameter;
         this.writable = p.writable.value === "true";
         this.dualPort = p.dualPort.value === "true";
         this.size = parseInt((ref = p.memorySize) != null ? ref.value : void 0);
-        return MemoryDevice.prototype.load.call(this, module);
+        return MemoryDevice.prototype.load.call(this, moddesc);
     }
 }
 Module.register(AlteraAvalonOnchipMemory2);
@@ -61,11 +64,11 @@ Module.register(AlteraAvalonOnchipMemory2);
 class AlteraAvalonNewSDRAMController extends MemoryDevice {
     static kind = "altera_avalon_new_sdram_controller";
 
-    load(module) {
+    load(moddesc: SopcInfoModule): Promise<void> {
         var p, ref;
-        p = module.parameter;
+        p = moddesc.parameter;
         this.size = parseInt((ref = p.size) != null ? ref.value : void 0);
-        return MemoryDevice.prototype.load.call(this, module);
+        return MemoryDevice.prototype.load.call(this, moddesc);
     }
 }
 Module.register(AlteraAvalonNewSDRAMController);

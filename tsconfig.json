@@ -6,7 +6,11 @@
             "es2015"
         ],
         "rootDir": ".",
-        "outDir": "lib"
+        "outDir": "lib",
+        "sourceMap": true,
+        "newLine": "LF",
+        "declaration": true,
+        "declarationDir": "types"
     },
     "exclude": [
         "node_modules/**/*"

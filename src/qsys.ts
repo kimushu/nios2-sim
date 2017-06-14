@@ -1,20 +1,23 @@
 import * as dedent from "dedent";
 import { parseString } from "xml2js";
-import { Module } from "./module";
+import { Module, ProcessorModule } from "./module";
 import { IpCatalog } from "./ipcatalog";
-import { SopcInfo } from "./sopcinfo";
+import { SopcInfo, SopcInfoRoot } from "./sopcinfo";
+import { ElfImage, SimulatorOptions } from "./simulator";
+import { hex8p } from "./sprintf";
 
 const BARE_RAM_BASE = 0x00001000;
 const BARE_RAM_SIZE = 0x10000000 - BARE_RAM_BASE;
 
 export class Qsys {
-    public modules = {};
-    public info;
+    public modules: {[path: string]: Module} = {};
+    public root: SopcInfoRoot;
+    public cpu: ProcessorModule;
 
-    constructor(public options) {
+    constructor(public options: SimulatorOptions) {
     }
 
-    create(image) {
+    create(image: ElfImage): Promise<void> {
         return this.load(dedent`
         <?xml version="1.0" encoding="UTF-8"?>
         <EnsembleReport name="default_system" kind="default_system" fabric="QSYS">
@@ -76,102 +79,87 @@ export class Qsys {
         `);
     }
 
-    load(xml) {
+    load(xml: Buffer): Promise<void> {
         return Promise.resolve().then(() => {
             return SopcInfo.parse(xml);
         })
-        .then((info) => {
-            this.info = info;
-            if (this.info.fabric !== "QSYS") {
-                return Promise.reject(Error("Invalid .sopcinfo file"));
+        .then((root) => {
+            this.root = root;
+            if (this.root.fabric !== "QSYS") {
+                throw new Error("Invalid .sopcinfo file");
             }
             let cat = new IpCatalog(this.options);
-            let names = Object.keys(this.info.module);
+            let names = Object.keys(this.root.module);
             return names.reduce((promise, name) => {
                 return promise
                 .then(() => {
-                    var cls, m, mod;
-                    m = this.info.module[name];
-                    this.options.printInfo("Adding module: " + m.path + " (" + m.kind + ")", 2);
-                    cls = cat.search(m.kind);
+                    var cls, mod;
+                    let moddesc = this.root.module[name];
+                    this.options.printInfo(`Adding module: ${moddesc.path} (${moddesc.kind})`, 2);
+                    cls = cat.search(moddesc.kind);
                     if (cls == null) {
-                        throw Error("No emulator for " + m.kind + " module");
+                        throw Error(`No emulator for ${moddesc.kind} module`);
                     }
-                    mod = new cls(m.path, this, this.options);
-                    this.modules[m.path] = mod;
-                    return mod.load(m);
+                    mod = new cls(moddesc.path, this, this.options);
+                    this.modules[moddesc.path] = mod;
+                    return mod.load(moddesc);
                 });
             }, Promise.resolve());
         })
         .then(() => {
-            let names = Object.keys(this.modules);
-            this.options.printInfo("Connecting modules");
-            return names.reduce((promise, name) => {
+            let paths = Object.keys(this.modules);
+            this.options.printInfo("Connecting modules", 1);
+            return paths.reduce((promise, path) => {
                 return promise
-                .then(() => {
-                    return this.modules[name].connect();
-                });
+                .then(() => this.modules[path].connect());
             }, Promise.resolve());
         });
     }
 
-    loadImage(image) {
-        var cpu;
-        cpu = null;
+    loadImage(image: ElfImage): Promise<void> {
         return Promise.resolve()
         .then(() => {
-            var c, cpu_name, n, ref, ref1, ref2, ref3, ref4;
-            cpu_name = (ref = image.body) != null ? (ref1 = ref.sections.find(function (s) {
-                return s.name === ".cpu";
-            })) != null ? ref1.data.toString() : void 0 : void 0;
-            if (cpu_name != null) {
-                cpu = this.modules[cpu_name];
-                if (!(cpu != null ? cpu.isProcessor : void 0)) {
-                    throw Error("Processor \"" + cpu_name + "\" is not found in this system");
+            let section = image.body.sections.find((section) => (section.name === ".cpu"));
+            let cpu_path = (section != null) ? section.data.toString() : null;
+            if (cpu_path != null) {
+                let mod = this.modules[cpu_path];
+                if (!(mod instanceof ProcessorModule)) {
+                    throw Error(`Processor "${cpu_path}" is not found in this system`);
                 }
+                this.cpu = mod;
             } else {
-                ref2 = this.modules;
-                for (n in ref2) {
-                    c = ref2[n];
-                    if (c.isProcessor) {
-                        cpu = c;
+                for (let path of Object.keys(this.modules)) {
+                    let mod = this.modules[path];
+                    if (mod instanceof ProcessorModule) {
+                        this.cpu = mod;
                         break;
                     }
                 }
-                if (cpu == null) {
+                if (this.cpu == null) {
                     throw Error("No processor detected in this system");
                 }
-                this.options.printWarn("No processor specified. Use \"" + cpu.name + "\"");
+                this.options.printWarn(`No processor specified. Use "${this.cpu.name}"`);
             }
-            this.options.printInfo("Deploying executable image through processor \"" + cpu.name + "\"", 1);
-            return ((ref3 = (ref4 = image.body) != null ? ref4.programs : void 0) != null ? ref3 : []).reduce(function (promise, p) {
+            this.options.printInfo(`Deploying executable image through processor "${this.cpu.name}"`, 1);
+            return image.body.programs.reduce((promise, p) => {
                 if (!(p.type === "load" || p.type === "lz4-load")) {
                     return promise;
                 }
-                return promise.then(function () {
-                    var ba, ea, hex8, zs;
-                    ba = p.paddr;
-                    ea = ba + p.memsz;
-                    hex8 = function (v) {
-                        return ("0000000" + (v >>> 0).toString(16)).substr(-8);
-                    };
-                    this.options.printInfo("Writing memory 0x" + (hex8(ba)) + "-0x" + (hex8(ea - 1)), 2);
+                return promise
+                .then(() => {
+                    let ba = p.paddr;
+                    let ea = ba + p.memsz;
+                    this.options.printInfo(`Writing memory ${hex8p(ba)}-${hex8p(ea - 1)}`, 2);
                     if (p.filesz > 0) {
-                        cpu.loadProgram(ba, p.data);
+                        this.cpu.loadProgram(ba, p.data);
                     }
                     ba += p.filesz;
-                    zs = ea - ba;
+                    let zs = ea - ba;
                     if (zs > 0) {
-                        return cpu.loadProgram(ba, Buffer.alloc(zs));
+                        return this.cpu.loadProgram(ba, Buffer.alloc(zs));
                     }
                 });
             }, Promise.resolve());
-        })
-        .then(() => {
-            cpu.resetProcessor();
-        })
-        .then(() => {
-            return cpu.runner;
         });
     }
 }

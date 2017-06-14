@@ -93,9 +93,7 @@ for (let i = 0, k = 0; k < 32; i = ++k) {
     }
 }
 
-function HEX8(v: number): string {
-    return "0x" + ("0000000" + (v >>> 0).toString(16)).substr(-8);
-}
+import { hex8p as HEX8 } from "./sprintf";
 
 function SE16(v: number): number {
     return (v << 16) >> 16;
@@ -431,7 +429,7 @@ def(0x36, TYPE_I, function (ra, rb, s16) {
 });
 
 def(0x37, TYPE_I, function (ra, rb, s16) {
-    this.gpr[rb] = this.ioread32(this.gpr[ra] + s16, 4);
+    this.gpr[rb] = this.ioread32(this.gpr[ra] + s16);
 }, function (ra, rb, s16) {
     return D_ROR("ldwio", rb, s16, ra);
 });
@@ -689,7 +687,8 @@ def(0x283a, TYPE_R, function (ra, rb, rc) {
 });
 
 def(0x293a, TYPE_R, function (ra) {
-    throw 0;
+    //throw 0;
+    return;
 }, function (ra) {
     return D_R("initi", ra);
 });
@@ -706,6 +705,11 @@ def(0x2d3a, TYPE_R, function () {
 def(0x2e3a, TYPE_R, function (ra, rb, rc, opx) {
     var n;
     n = opx & 0x1f;
+    switch (n) {
+        case 0:
+            this.sts = this.gpr[ra];
+            return;
+    }
     throw 0;
 }, function (ra, rb, rc, opx) {
     var n;

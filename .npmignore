@@ -1,4 +1,4 @@
 /src
 /*.tgz
 /.npmignore
-/Makefile
+/test

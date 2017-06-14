@@ -1,44 +1,56 @@
 import { Interface } from "./interface";
+import { Qsys } from "./qsys";
+import { SimulatorOptions } from "./simulator";
+import { SopcInfoInterface, SopcInfoModule } from "./sopcinfo";
+
+export interface ModuleConstructor extends Function {
+    readonly kind: string;
+    new (path: string, system: Qsys, options: SimulatorOptions): Module;
+}
 
 export class Module {
-    public name;
-    public interfaces = [];
+    public name: string;
+    public interfaces: {[name: string]: Interface} = {};
 
-    static register(subclass) {
+    static register(subclass: ModuleConstructor): void {
         IpCatalog.register(subclass.kind, subclass);
     }
 
-    constructor(public path, public system, public options) {
+    constructor(public path: string, public system: Qsys, public options: SimulatorOptions) {
     }
 
-    load(module) {
-        this.name = module.name;
+    load(moddesc: SopcInfoModule): Promise<void> {
+        this.name = moddesc.name;
+        return Promise.resolve();
     }
 
-    connect() {
+    connect(): void {
         for (let name in this.interfaces) {
             this.interfaces[name].connect();
         }
     }
 
-    loadInterface(ifc) {
-        let cls = Interface.search(ifc.kind);
+    loadInterface(ifdesc: SopcInfoInterface): Interface {
+        let cls = Interface.search(ifdesc.kind);
         if (cls == null) {
             throw Error("No emulator for #{ifc.kind} interface");
         }
         let inst = new cls(this, this.options);
-        this.interfaces[ifc.name] = inst;
-        inst.load(ifc);
+        this.interfaces[ifdesc.name] = inst;
+        inst.load(ifdesc);
         return inst;
     }
 }
 
-export class DummyModule extends Module {
-    load(module) {
-        for (let name in module.interfaces) {
-            this.loadInterface(module.interfaces[name]);
-        }
-        return Module.prototype.load.call(this, module);
+export class ProcessorModule extends Module {
+    loadProgram(addr: number, data: Buffer): Promise<void> {
+        return Promise.reject(new Error("pure function"));
+    }
+    resetProcessor(): void {
+        throw new Error("pure function");
+    }
+    runProcessor(steps?: number): Promise<number> {
+        return Promise.reject(new Error("pure function"));
     }
 }
 

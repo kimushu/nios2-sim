@@ -1,1 +1,1 @@
-@node .\nios2-simulator %*
+@node %~dp0\nios2-sim %*

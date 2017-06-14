@@ -133,3 +133,15 @@ const RP = function (values: any[], match: any, flags: string, s_width: string, 
 export function sprintf(format: string, ...values: any[]) {
     return format.replace(RE, (...args: any[]) => (<any>RP)(values, ...args));
 }
+
+export function hex8(value: number): string {
+    return `0000000${value.toString(16)}`.substr(-8);
+}
+
+export function hex8p(value: number): string {
+    return `0x${hex8(value)}`;
+}
+
+export function dec12(value: number): string {
+    return `00000000000${value}`.substr(-12);
+}
