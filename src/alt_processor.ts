@@ -10,6 +10,7 @@ enum Nios2State {
     NOT_RUNNING,
     RUNNING,
     FETCHING_INSTRUCTION_WORDS,
+    EXECUTING_INSTRUCTION,
     ABORTED,
     ABORTED_BY_INFINITE_LOOP = ABORTED,
 }
@@ -157,6 +158,9 @@ class AlteraNios2 extends ProcessorModule {
         if (this._state === Nios2State.NOT_INITIALIZED) {
             return Promise.reject(new Error("Not initialized"));
         }
+        if (this._state > Nios2State.RUNNING) {
+            return Promise.reject(new Error("Operation waiting"));
+        }
         if (this._state >= Nios2State.ABORTED) {
             return Promise.reject(new Error("Already aborted"));
         }
@@ -178,6 +182,7 @@ class AlteraNios2 extends ProcessorModule {
                     if (result instanceof Promise) {
                         this._state = Nios2State.FETCHING_INSTRUCTION_WORDS;
                         return result.then((i32) => {
+                            this._state = Nios2State.RUNNING;
                             this.inst = i32;
                             return total;
                         });
@@ -201,25 +206,42 @@ class AlteraNios2 extends ProcessorModule {
 
             // Execute instruction
             let newpc = this._cpu_exec(iw);
-            this.gpr[0] = 0;
-            ++this.icnt;
-            if (newpc != null) {
-                // Jump
-                if (newpc === this.pc) {
-                    this._state = Nios2State.ABORTED_BY_INFINITE_LOOP;
-                    return Promise.reject(
-                        new Error(`Simulation aborted by infinite loop at ${this.pc}`)
-                    );
-                }
-                this.iidx += (newpc - this.pc) >> 2;
-                this.pc = newpc;
-            } else {
-                // No jump
-                ++this.iidx;
-                this.pc += 4;
+            if (newpc instanceof Promise) {
+                this._state = Nios2State.EXECUTING_INSTRUCTION;
+                return newpc.then((newpc: number) => {
+                    this._state = Nios2State.RUNNING;
+                    return this._cpu_finish(newpc);
+                })
+                .then(() => {
+                    return total;
+                });
+            }
+            let result = this._cpu_finish(newpc);
+            if (result != null) {
+                return result;
             }
         }
         return Promise.resolve(total);
+    }
+
+    private _cpu_finish(newpc: number): Promiseable<never> {
+        this.gpr[0] = 0;
+        ++this.icnt;
+        if (newpc != null) {
+            // Jump
+            if (newpc === this.pc) {
+                this._state = Nios2State.ABORTED_BY_INFINITE_LOOP;
+                return Promise.reject(
+                    new Error(`Simulation aborted by infinite loop at ${this.pc}`)
+                );
+            }
+            this.iidx += (newpc - this.pc) >> 2;
+            this.pc = newpc;
+        } else {
+            // No jump
+            ++this.iidx;
+            this.pc += 4;
+        }
     }
 
     private _cpu_exec = core.exec;

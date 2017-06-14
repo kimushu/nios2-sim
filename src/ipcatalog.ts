@@ -1,6 +1,10 @@
 import { ModuleConstructor } from "./module";
 import { SimulatorOptions } from "./simulator";
 
+export interface Nios2SimIpPlugin {
+    getModuleConstructor(kind: string): ModuleConstructor;
+}
+
 interface ModuleConstructorSet {
     [kind: string]: ModuleConstructor;
 }
@@ -21,8 +25,8 @@ export class IpCatalog {
         let constructor = this.local[kind] || IpCatalog.global[kind];
         if ((constructor == null) && !this.options.noPlugin) {
             try {
-                let plugin = require(`nios2-sim-ip-${kind.toLowerCase()}`);
-                constructor = plugin.getConstructor(kind);
+                let plugin: Nios2SimIpPlugin = require(`nios2-sim-ip-${kind.toLowerCase()}`);
+                constructor = plugin.getModuleConstructor(kind);
             } catch (error) {
                 // Ignore error
             }
