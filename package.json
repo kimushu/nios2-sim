@@ -1,42 +1,42 @@
 {
-    "name": "nios2-sim",
-    "version": "0.1.0",
-    "description": "NiosII simulator",
-    "main": "lib/src/index.js",
-    "types": "types/index.d.ts",
-    "scripts": {
-        "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --no-plugin --cpu-trace -vvv",
-        "pretest": "npm run compile",
-        "prepublish": "npm run compile",
-        "compile": "tsc -p ."
-    },
-    "bin": {
-        "nios2-sim": "bin/nios2-sim"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/kimushu/nios2-sim.git"
-    },
-    "engines": {
-        "node": ">=6.0.0"
-    },
-    "author": "kimu_shu",
-    "license": "MIT",
-    "bugs": {
-        "url": "https://github.com/kimushu/nios2-sim/issues"
-    },
-    "homepage": "https://github.com/kimushu/nios2-sim#readme",
-    "devDependencies": {
-        "@types/node": "^7.0.31",
-        "@types/xml2js": "0.0.33",
-        "tslint": "^5.4.3",
-        "typescript": "^2.3.4"
-    },
-    "dependencies": {
-        "colors": "^1.1.2",
-        "commander": "^2.9.0",
-        "dedent": "^0.7.0",
-        "elfy": "^0.1.0",
-        "xml2js": "^0.4.17"
-    }
+  "name": "nios2-sim",
+  "version": "0.1.1",
+  "description": "NiosII simulator",
+  "main": "lib/src/index.js",
+  "types": "types/index.d.ts",
+  "scripts": {
+    "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --no-plugin --cpu-trace -vvv",
+    "pretest": "npm run compile",
+    "prepublish": "npm run compile",
+    "compile": "tsc -p ."
+  },
+  "bin": {
+    "nios2-sim": "bin/nios2-sim"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimushu/nios2-sim.git"
+  },
+  "engines": {
+    "node": ">=6.0.0"
+  },
+  "author": "kimu_shu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kimushu/nios2-sim/issues"
+  },
+  "homepage": "https://github.com/kimushu/nios2-sim#readme",
+  "devDependencies": {
+    "@types/node": "^7.0.31",
+    "@types/xml2js": "0.0.33",
+    "tslint": "^5.4.3",
+    "typescript": "^2.3.4"
+  },
+  "dependencies": {
+    "colors": "^1.1.2",
+    "commander": "^2.9.0",
+    "dedent": "^0.7.0",
+    "elfy": "^0.1.0",
+    "xml2js": "^0.4.17"
+  }
 }
