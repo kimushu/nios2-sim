@@ -117,7 +117,6 @@ export class AvalonMaster extends Interface {
     read32(addr: number, bytes?: number): Promiseable<Int32Array> {
         let s = this._getSlave(addr);
         if (s != null) {
-            console.log(addr, s.link.name, s.link.module.name);
             return s.link.read32((addr - s.base) >>> 2, bytes);
         }
     }

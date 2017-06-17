@@ -23,10 +23,12 @@ export class IpCatalog {
 
     search(kind: string, useDummy: boolean = true): ModuleConstructor {
         let constructor = this.local[kind] || IpCatalog.global[kind];
-        if ((constructor == null) && !this.options.noPlugin) {
+        if ((constructor == null) && this.options.plugin) {
             try {
-                let plugin: Nios2SimIpPlugin = require(`nios2-sim-ip-${kind.toLowerCase()}`);
+                let pluginName = `nios2-sim-ip-${kind.toLowerCase()}`;
+                let plugin: Nios2SimIpPlugin = require(pluginName);
                 constructor = plugin.getModuleConstructor(kind);
+                this.options.printInfo(`Plugin loaded: ${pluginName}`);
             } catch (error) {
                 // Ignore error
             }
@@ -41,13 +43,20 @@ export class IpCatalog {
 
 import { Module } from "./module";
 import { SopcInfoModule } from "./sopcinfo";
+import { AvalonSlave } from "./interface";
 
 class DummyModule extends Module {
     static kind = "nios2_sim_dummy_module";
 
     load(moddesc: SopcInfoModule): Promise<void> {
         for (let name in moddesc.interface) {
-            this.loadInterface(moddesc.interface[name]);
+            let i = this.loadInterface(moddesc.interface[name]);
+            if (i instanceof AvalonSlave) {
+                // Avalon slave of dummy module always return zero
+                i.read32 = (offset: number, count?: number) => {
+                    return new Int32Array((count != null) ? count : 1);
+                };
+            }
         }
         return Module.prototype.load.call(this, moddesc);
     }

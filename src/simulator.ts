@@ -6,7 +6,7 @@ export interface SimulatorOptions {
     sopcinfo: string;
     ignoreUnknown: boolean;
     cpuTrace: boolean;
-    noPlugin: boolean;
+    plugin: boolean;
     verbose: number;
     args: string[];
     printInfo: (message: string, verbosity?: number) => void;
@@ -125,6 +125,7 @@ export class Simulator {
         .option("-s, --sopcinfo <sopcinfo>", "Specify .sopcinfo file")
         .option("--ignore-unknown", "Ignore unknown components")
         .option("--cpu-trace", "Show CPU trace")
+        .option("--no-plugin", "Disable plugins")
         .option("-v, --verbose", "Increase verbosity", (v, t) => (t + 1), 0)
         .parse(argv);
         if (program.args.length === 0) {

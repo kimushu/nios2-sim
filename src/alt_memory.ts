@@ -12,7 +12,7 @@ class MemoryDevice extends Module {
     public s2: AvalonSlave;
 
     load(moddesc: SopcInfoModule): Promise<void> {
-        let p = moddesc.parameter;
+        let p = moddesc.parameter || {};
         let i = moddesc.interface;
         this.options.printInfo(`[${this.path}] Memory device (${this.size} bytes)`, 2);
         if (this.writable == null) {
@@ -51,11 +51,10 @@ class AlteraAvalonOnchipMemory2 extends MemoryDevice {
     static kind = "altera_avalon_onchip_memory2";
 
     load(moddesc: SopcInfoModule): Promise<void> {
-        var p, ref;
-        p = moddesc.parameter;
+        let p = moddesc.parameter || {};
         this.writable = p.writable.value === "true";
         this.dualPort = p.dualPort.value === "true";
-        this.size = parseInt((ref = p.memorySize) != null ? ref.value : void 0);
+        this.size = parseInt((p.memorySize || <any>{}).value || 0);
         return MemoryDevice.prototype.load.call(this, moddesc);
     }
 }
@@ -65,9 +64,8 @@ class AlteraAvalonNewSDRAMController extends MemoryDevice {
     static kind = "altera_avalon_new_sdram_controller";
 
     load(moddesc: SopcInfoModule): Promise<void> {
-        var p, ref;
-        p = moddesc.parameter;
-        this.size = parseInt((ref = p.size) != null ? ref.value : void 0);
+        let p = moddesc.parameter || {};
+        this.size = parseInt((p.size || <any>{}).value || 0);
         return MemoryDevice.prototype.load.call(this, moddesc);
     }
 }

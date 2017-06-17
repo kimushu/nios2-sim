@@ -1,2 +1,3 @@
 import { Simulator } from "./simulator";
-export { Simulator };
+import { Module } from "./module";
+export { Simulator, Module };

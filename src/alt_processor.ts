@@ -77,7 +77,7 @@ class AlteraNios2 extends ProcessorModule {
 
     load(moddesc: SopcInfoModule): Promise<void> {
         let a = moddesc.assignment;
-        let p = moddesc.parameter;
+        let p = moddesc.parameter || {};
         let i = moddesc["interface"];
         this.cfg = {
             bigEndian: (p.setting_bigEndian || <any>{}).value === "true",

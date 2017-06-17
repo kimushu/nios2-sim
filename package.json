@@ -1,10 +1,10 @@
 {
     "name": "nios2-sim",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "description": "NiosII simulator",
     "main": "lib/src/index.js",
     "scripts": {
-        "test": "mocha",
+        "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --no-plugin --cpu-trace -vvv",
         "pretest": "npm run compile",
         "prepublish": "npm run compile",
         "compile": "tsc -p ."
