@@ -2,3 +2,6 @@
 /*.tgz
 /.npmignore
 /test
+/.vscode
+*.js.map
+/ts*.json
