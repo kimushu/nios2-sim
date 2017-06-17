@@ -1,6 +1,6 @@
 {
   "name": "nios2-sim",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "NiosII simulator",
   "main": "lib/src/index.js",
   "types": "types/src/index.d.ts",
