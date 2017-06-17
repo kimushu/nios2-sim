@@ -3,6 +3,7 @@
     "version": "0.1.0",
     "description": "NiosII simulator",
     "main": "lib/src/index.js",
+    "types": "types/index.d.ts",
     "scripts": {
         "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --no-plugin --cpu-trace -vvv",
         "pretest": "npm run compile",
