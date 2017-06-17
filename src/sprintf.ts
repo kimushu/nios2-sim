@@ -135,7 +135,7 @@ export function sprintf(format: string, ...values: any[]) {
 }
 
 export function hex8(value: number): string {
-    return `0000000${value.toString(16)}`.substr(-8);
+    return `0000000${(value >>> 0).toString(16)}`.substr(-8);
 }
 
 export function hex8p(value: number): string {
@@ -143,5 +143,5 @@ export function hex8p(value: number): string {
 }
 
 export function dec12(value: number): string {
-    return `00000000000${value}`.substr(-12);
+    return `00000000000${(value >>> 0)}`.substr(-12);
 }
