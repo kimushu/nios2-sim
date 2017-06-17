@@ -68,6 +68,9 @@ export class Qsys {
                 </interface>
             </module>
             <module name="ram" kind="altera_avalon_new_sdram_controller" path="ram">
+                <parameter name="size">
+                    <value>${BARE_RAM_SIZE}</value>
+                </parameter>
                 <interface name="s1" kind="avalon_slave">
                     <assignment>
                         <name>embeddedsw.configuration.isMemoryDevice</name>
