@@ -5,7 +5,7 @@
   "main": "lib/src/index.js",
   "types": "types/src/index.d.ts",
   "scripts": {
-    "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --no-plugin --cpu-trace -vvv",
+    "test": "node bin/nios2-sim test/olive_rubic_duktape.elf --ignore-unknown --cpu-trace --break-js 0xf0002f8 -vvv",
     "pretest": "npm run compile",
     "prepublish": "npm run compile",
     "compile": "tsc -p ."

@@ -7,6 +7,7 @@ export interface SimulatorOptions {
     ignoreUnknown: boolean;
     cpuTrace: boolean;
     plugin: boolean;
+    breakJs: number[];
     verbose: number;
     args: string[];
     printInfo: (message: string, verbosity?: number) => void;
@@ -126,6 +127,10 @@ export class Simulator {
         .option("--ignore-unknown", "Ignore unknown components")
         .option("--cpu-trace", "Show CPU trace")
         .option("--no-plugin", "Disable plugins")
+        .option("--break-js <addr>", "Set JS breakpoint", (v, t) => {
+            t.push(parseInt(v));
+            return t;
+        }, [])
         .option("-v, --verbose", "Increase verbosity", (v, t) => (t + 1), 0)
         .parse(argv);
         if (program.args.length === 0) {

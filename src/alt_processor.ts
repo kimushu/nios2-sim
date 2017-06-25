@@ -15,6 +15,14 @@ enum Nios2State {
     ABORTED_BY_INFINITE_LOOP = ABORTED,
 }
 
+interface Nios2Breakpoint {
+    js?: boolean;
+}
+
+interface Nios2BreakpointSet {
+    [addr: number]: Nios2Breakpoint;
+}
+
 class AlteraNios2 extends ProcessorModule {
     static kind = "altera_nios2_qsys";
 
@@ -75,6 +83,9 @@ class AlteraNios2 extends ProcessorModule {
     /** Current state */
     private _state: Nios2State = Nios2State.NOT_INITIALIZED;
 
+    /** Breakpoints */
+    private _bkpt: Nios2BreakpointSet = {};
+
     load(moddesc: SopcInfoModule): Promise<void> {
         let a = moddesc.assignment;
         let p = moddesc.parameter || {};
@@ -125,6 +136,10 @@ class AlteraNios2 extends ProcessorModule {
             summary.push("hw-mulx");
         }
         this.options.printInfo(`[${this.path}] NiosII processor (${summary.join(", ")})`, 2);
+        for (let addr of this.options.breakJs) {
+            this.options.printInfo(`[${this.path}] Breakpoint (JS) set at ${hex8p(addr)}`);
+            this._bkpt[addr] = { js: true };
+        }
         return ProcessorModule.prototype.load.call(this, moddesc);
     }
 
@@ -215,6 +230,14 @@ class AlteraNios2 extends ProcessorModule {
             // Trace
             if (this.options.cpuTrace) {
                 console.log(`(${dec12(this.icnt)}) ${hex8(this.pc)}: ${hex8(iw)}\t${this._cpu_disas(iw)}`);
+            }
+
+            // Breakpoint check
+            let bkpt = this._bkpt[this.pc];
+            if (bkpt) {
+                if (bkpt.js) {
+                    debugger;
+                }
             }
 
             // Execute instruction

@@ -12,8 +12,9 @@
                 "${workspaceRoot}/bin/nios2-sim",
                 "${workspaceRoot}/test/olive_rubic_duktape.elf",
                 "--ignore-unknown",
-                "--no-plugin",
+                //"--no-plugin",
                 "--cpu-trace",
+                "--break-js", "0xf0002f8",
                 "-vvv"
             ],
             "outFiles": [
