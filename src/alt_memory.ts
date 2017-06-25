@@ -11,7 +11,7 @@ class MemoryDevice extends Module {
     public s1: AvalonSlave;
     public s2: AvalonSlave;
 
-    load(moddesc: SopcInfoModule): Promise<void> {
+    load(moddesc: SopcInfoModule, s1name: string = "s1", s2name: string = "s2"): Promise<void> {
         let p = moddesc.parameter || {};
         let i = moddesc.interface;
         this.options.printInfo(`[${this.path}] Memory device (${this.size} bytes)`, 2);
@@ -29,9 +29,9 @@ class MemoryDevice extends Module {
             }
             throw new Error(`slave "${i.name}" is not AvalonSlave interface`);
         }
-        this.s1 = requireAvalonSlave(this.loadInterface(i.s1));
+        this.s1 = requireAvalonSlave(this.loadInterface(i[s1name]));
         if (this.dualPort) {
-            this.s2 = requireAvalonSlave(this.loadInterface(i.s2));
+            this.s2 = requireAvalonSlave(this.loadInterface(i[s2name]));
         }
         return Module.prototype.load.call(this, moddesc);
     }
@@ -40,10 +40,16 @@ class MemoryDevice extends Module {
         this.s1.read32 = (offset: number, count?: number): Int32Array => {
             return this.i32.subarray(offset, (count != null) ? (offset + count) : undefined);
         };
-        this.s1.write32 = (offset: number, value: number, byteEnable: number = 0xffffffff): boolean => {
-            this.i32[offset] = (this.i32[offset] & ~byteEnable) | (value & byteEnable);
-            return true;
-        };
+        if (this.writable) {
+            this.s1.write32 = (offset: number, value: number, byteEnable: number = 0xffffffff): boolean => {
+                this.i32[offset] = (this.i32[offset] & ~byteEnable) | (value & byteEnable);
+                return true;
+            };
+        } else {
+            this.s1.write32 = (offset: number, value: number, byteEnable?: number): boolean => {
+                return true;
+            };
+        }
         if (this.s2 != null) {
             this.s2.read32 = this.s1.read32;
             this.s2.write32 = this.s1.write32;
@@ -75,3 +81,23 @@ class AlteraAvalonNewSDRAMController extends MemoryDevice {
     }
 }
 Module.register(AlteraAvalonNewSDRAMController);
+
+class AlteraOnchipFlash extends MemoryDevice {
+    static kind = "altera_onchip_flash";
+
+    load(moddesc: SopcInfoModule): Promise<void> {
+        let a = moddesc.assignment;
+        this.size = 0;
+        this.writable = false;
+        if (a.embeddedsw.CMacro.READ_ONLY_MODE !== "1") {
+            this.options.printWarn(`Write operations will be ignored: ${moddesc.path}`);
+        }
+        for (let sector = 1; sector <= 5; ++sector) {
+            if (a.embeddedsw.CMacro[`SECTOR${sector}_ENABLED`] === "1") {
+                this.size = parseInt(a.embeddedsw.CMacro[`SECTOR${sector}_END_ADDR`]) + 1;
+            }
+        }
+        return MemoryDevice.prototype.load.call(this, moddesc, "data");
+    }
+}
+Module.register(AlteraOnchipFlash);

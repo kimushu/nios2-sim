@@ -230,6 +230,11 @@ export class NiosCustomInstructionMaster extends Interface {
 }
 Interface.register(NiosCustomInstructionMaster);
 
+export class NiosCustomInstructionSlave extends Interface {
+    static kind = "nios_custom_instruction_slave";
+}
+Interface.register(NiosCustomInstructionSlave);
+
 export class ResetSink extends Interface {
     static kind = "reset_sink";
 }

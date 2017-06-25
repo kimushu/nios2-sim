@@ -33,7 +33,7 @@ export class Module {
     loadInterface(ifdesc: SopcInfoInterface): Interface {
         let cls = Interface.search(ifdesc.kind);
         if (cls == null) {
-            throw Error("No emulator for #{ifc.kind} interface");
+            throw Error(`No emulator for ${ifdesc.kind} interface`);
         }
         let inst = new cls(this, this.options);
         this.interfaces[ifdesc.name] = inst;
