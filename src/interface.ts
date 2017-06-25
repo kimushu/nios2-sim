@@ -121,24 +121,24 @@ export class AvalonMaster extends Interface {
         }
     }
 
-    write8(addr: number, array: Int8Array) {
+    write8(addr: number, value: number) {
         let s = this._getSlave(addr);
         if (s != null) {
-            return s.link.write8((addr - s.base) >>> 0, array);
+            return s.link.write8((addr - s.base) >>> 0, value);
         }
     }
 
-    write16(addr: number, array: Int16Array) {
+    write16(addr: number, value: number) {
         let s = this._getSlave(addr);
         if (s != null) {
-            return s.link.write16((addr - s.base) >>> 1, array);
+            return s.link.write16((addr - s.base) >>> 1, value);
         }
     }
 
-    write32(addr: number, array: Int32Array) {
+    write32(addr: number, value: number) {
         let s = this._getSlave(addr);
         if (s != null) {
-            return s.link.write32((addr - s.base) >>> 2, array);
+            return s.link.write32((addr - s.base) >>> 2, value);
         }
     }
 }
@@ -171,7 +171,7 @@ export class AvalonSlave extends Interface {
 
     read16(offset: number, bytes?: number): Promiseable<Int16Array> {
         let woff = offset & 1;
-        let off32 = offset >> 1;
+        let off32 = offset >>> 1;
         let cnt32 = (bytes != null) ? ((woff + bytes + 1) >>> 1) : null;
         return then(
             this.read32(off32, cnt32),
@@ -181,26 +181,17 @@ export class AvalonSlave extends Interface {
 
     read32: (this: AvalonSlave, offset: number, bytes?: number) => Promiseable<Int32Array>;
 
-    write8(offset: number, array: Int8Array): Promiseable<boolean> {
-        return then(
-            this.read8(offset, array.length),
-            (i8) => i8.set(array) || true
-        );
+    write8(offset: number, value: number): Promiseable<boolean> {
+        let shift = ((offset & 3) << 3);
+        return this.write32(offset >>> 2, value << shift, 0xff << shift);
     }
 
-    write16(offset: number, array: Int16Array): Promiseable<boolean> {
-        return then(
-            this.read16(offset, array.length),
-            (i16) => i16.set(array) || true
-        );
+    write16(offset: number, value: number): Promiseable<boolean> {
+        let shift = ((offset & 2) << 3);
+        return this.write32(offset >>> 1, value <<shift, 0xffff << shift);
     }
 
-    write32(offset: number, array: Int32Array): Promiseable<boolean> {
-        return then(
-            this.read32(offset, array.length),
-            (i32) => i32.set(array) || true
-        );
-    }
+    write32: (this: AvalonSlave, offset: number, value: number, byteEnable?: number) => Promiseable<boolean>;
 }
 Interface.register(AvalonSlave);
 

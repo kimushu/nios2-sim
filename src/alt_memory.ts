@@ -37,11 +37,16 @@ class MemoryDevice extends Module {
     }
 
     connect(): void {
-        this.s1.read32 = (offset: number, count?: number) => {
+        this.s1.read32 = (offset: number, count?: number): Int32Array => {
             return this.i32.subarray(offset, (count != null) ? (offset + count) : undefined);
+        };
+        this.s1.write32 = (offset: number, value: number, byteEnable: number = 0xffffffff): boolean => {
+            this.i32[offset] = (this.i32[offset] & ~byteEnable) | (value & byteEnable);
+            return true;
         };
         if (this.s2 != null) {
             this.s2.read32 = this.s1.read32;
+            this.s2.write32 = this.s1.write32;
         }
         return Module.prototype.connect.call(this);
     }

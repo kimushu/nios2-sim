@@ -129,14 +129,27 @@ class AlteraNios2 extends ProcessorModule {
     }
 
     loadProgram(addr: number, data: Buffer): Promise<void> {
+        let msg = `Cannot write memory from ${hex8p(addr)}`;
         let array = new Int8Array(data);
         for (let im of this.im) {
-            let result = im.write8(addr, array);
+            let result = im.read8(addr, array.length);
             if (result != null) {
-                return Promise.resolve(result).then(() => {});
+                return Promise.resolve(result)
+                .then((i8) => {
+                    if (i8.length !== array.length) {
+                        throw new Error(`${msg}: Not memory block`);
+                    }
+                    i8.set(array);
+                    return im.read8(addr, array.length);
+                })
+                .then((i8) => {
+                    if (Buffer.from([i8]).compare(Buffer.from([array])) !== 0) {
+                        throw new Error(`${msg}: Verify failed`);
+                    }
+                });
             }
         }
-        return Promise.reject(new Error(`Cannot write memory from ${hex8p(addr)}`));
+        return Promise.reject(new Error(`${msg}: No slave found`));
     }
 
     resetProcessor(): void {
@@ -261,7 +274,7 @@ class AlteraNios2 extends ProcessorModule {
 
     dwrite8(addr: number, value: number): Promiseable<boolean> {
         for (let dm of this.dm) {
-            let result = dm.write8(addr, new Int8Array([value]));
+            let result = dm.write8(addr, value);
             if (result != null) {
                 return result;
             }
@@ -273,7 +286,7 @@ class AlteraNios2 extends ProcessorModule {
 
     dwrite16(addr: number, value: number): Promiseable<boolean> {
         for (let dm of this.dm) {
-            let result = dm.write16(addr, new Int16Array([value]));
+            let result = dm.write16(addr, value);
             if (result != null) {
                 return result;
             }
@@ -285,7 +298,7 @@ class AlteraNios2 extends ProcessorModule {
 
     dwrite32(addr: number, value: number): Promiseable<boolean> {
         for (let dm of this.dm) {
-            let result = dm.write32(addr, new Int32Array([value]));
+            let result = dm.write32(addr, value);
             if (result != null) {
                 return result;
             }
