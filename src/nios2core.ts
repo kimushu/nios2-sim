@@ -413,14 +413,34 @@ def(0x30, TYPE_I, function (this: AlteraNios2, ra: number, rb: number, s16: numb
 });
 
 def(0x32, TYPE_R, function (this: AlteraNios2, ra: number, rb: number, rc: number, opx: number) {
-    throw 0;
+    if (this.cim == null) {
+        throw new Error("No custom instruction master");
+    }
+    let n, a, b;
+    n = (opx & 0xff);
+    a = (opx & 0x400) ? this.gpr[ra] : ra;
+    b = (opx & 0x200) ? this.gpr[rb] : rb;
+    return then(
+        this.cim.execute(n, a, b, rc),
+        (value) => {
+            if (opx & 0x100) {
+                this.gpr[rc] = value;
+            }
+        }
+    );
 }, function (this: AlteraNios2, ra: number, rb: number, rc: number, opx: number) {
     let d, n;
     n = opx & 0xff;
-    d = D_D("custom", n);
-    d += ", " + (opx & 0x4000 ? GPRN[rc] : "c" + rc);
-    d += ", " + (opx & 0x10000 ? GPRN[ra] : "c" + ra);
-    d += ", " + (opx & 0x8000 ? GPRN[rb] : "c" + rb);
+    d = D_D("custom", n) + ", ";
+    if (this.cim != null) {
+        let mnemonic = this.cim.getMnemonic(n);
+        if (mnemonic != null) {
+            d = D_N(mnemonic);
+        }
+    }
+    d += (opx & 0x100 ? GPRN[rc] : "c" + rc) + ", ";
+    d += (opx & 0x400 ? GPRN[ra] : "c" + ra) + ", ";
+    d += (opx & 0x200 ? GPRN[rb] : "c" + rb);
     return d;
 });
 

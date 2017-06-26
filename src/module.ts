@@ -61,4 +61,5 @@ require("./alt_clock");
 require("./alt_memory");
 require("./alt_peripheral");
 require("./alt_processor");
+require("./alt_fpu");
 require("./alt_serial");

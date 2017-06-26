@@ -400,6 +400,7 @@ interface CustomInstrSlaveLink {
     interfaceName: string;
     opcodeMnemonic: string;
     opcodeNumber: number;
+    opcodeCount: number;
     link: NiosCustomInstructionSlave;
 }
 
@@ -416,9 +417,11 @@ export class NiosCustomInstructionMaster extends Interface {
                 interfaceName: i[name].slaveName,
                 opcodeMnemonic: i[name].opcodeMnemonic,
                 opcodeNumber: parseInt(i[name].opcodeNumber),
+                opcodeCount: 0,
                 link: null,
             });
         }
+        this._slaves.sort((a, b) => a.opcodeNumber - b.opcodeNumber);
         return Interface.prototype.load.call(this, ifdesc);
     }
 
@@ -429,9 +432,61 @@ export class NiosCustomInstructionMaster extends Interface {
                 slave.link = <NiosCustomInstructionSlave>target.interfaces[slave.interfaceName];
                 slave.link.opcodeMnemonic = slave.opcodeMnemonic;
                 slave.link.opcodeNumber = slave.opcodeNumber;
+                slave.opcodeCount = slave.link.opcodeCount;
             }
         }
         return Interface.prototype.connect.call(this);
+    }
+
+    /**
+     * Get mnemonic of custom instruction
+     * @param n Custom instruction opcode (0~255)
+     */
+    getMnemonic(n: number): string {
+        let slave = this._getSlave(n);
+        if (slave != null) {
+            let method = slave.link.getMnemonic;
+            return method ? method.call(slave.link, n - slave.opcodeNumber) : null;
+        }
+    }
+
+    /**
+     * Execute custom instruction
+     * @param n Instruction select number
+     * @param a Register rA value or cA index
+     * @param b Register rB value or cB index
+     * @param c cC index
+     */
+    execute(n: number, a: number, b: number, c: number): Promiseable<number> {
+        let slave = this._getSlave(n);
+        if (slave != null) {
+            let result = slave.link.execute(n - slave.opcodeNumber, a, b, c);
+            if (result != null) {
+                return result;
+            }
+            throw new Error(`No custom instruction executor for n=${n}`);
+        }
+        throw new Error(`No custom instruction slave for n=${n}`);
+    }
+
+    /**
+     * Lookup custom instruction slave from opcode
+     * @param opcode Custom instruction opcode (0~255)
+     */
+    private _getSlave(n: number): CustomInstrSlaveLink {
+        let top: number = 0;
+        let btm: number = this._slaves.length;
+        while (top < btm) {
+            let mid = (top + btm) >>> 1;
+            let slave = this._slaves[mid];
+            if (n < slave.opcodeNumber) {
+                btm = mid;
+            } else if (n >= (slave.opcodeNumber + slave.opcodeCount)) {
+                top = mid + 1;
+            } else {
+                return slave;
+            }
+        }
     }
 }
 Interface.register(NiosCustomInstructionMaster);
@@ -439,12 +494,30 @@ Interface.register(NiosCustomInstructionMaster);
 export class NiosCustomInstructionSlave extends Interface {
     static kind = "nios_custom_instruction_slave";
 
+    public opcodeCount: number;
+
     public opcodeMnemonic: string;
     public opcodeNumber: number;
 
     load(ifdesc: SopcInfoInterface): void {
+        this.opcodeCount = 1 << parseInt(ifdesc.parameter.NPort.value);
         return Interface.prototype.load.call(this, ifdesc);
     }
+
+    /**
+     * Get mnemonic of custom instruction
+     * @param n Instruction select number
+     */
+    getMnemonic: (n: number) => string;
+
+    /**
+     * Execute custom instruction
+     * @param n Instruction select number
+     * @param a Register rA value or cA index
+     * @param b Register rB value or cB index
+     * @param c Register cC index
+     */
+    execute: (n: number, a: number, b: number, c: number) => Promiseable<number>;
 }
 Interface.register(NiosCustomInstructionSlave);
 
