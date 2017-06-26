@@ -148,13 +148,10 @@ export class Qsys {
                 if (!(p.type === "load" || p.type === "lz4-load")) {
                     return promise;
                 }
-                if (p.vaddr === 0) {
-                    return promise;
-                }
                 return promise
                 .then(() => {
                     let ba = p.paddr;
-                    let ea = ba + p.memsz;
+                    let ea = ba + p.filesz;
                     this.options.printInfo(`Writing memory ${hex8p(ba)}-${hex8p(ea - 1)}`, 2);
                     if (p.filesz > 0) {
                         this.cpu.loadProgram(ba, p.data);
