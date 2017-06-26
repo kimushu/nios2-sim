@@ -57,6 +57,18 @@ export interface SopcInfoInterruptSet {
     [name: string]: SopcInfoInterrupt;
 }
 
+export interface SopcInfoCustomInstr {
+    isBridge: string;
+    moduleName: string;
+    opcodeMnemonic: string;
+    opcodeNumber: string;
+    slaveName: string;
+}
+
+export interface SopcInfoCustomInstrSet {
+    [name: string]: SopcInfoCustomInstr;
+}
+
 export interface SopcInfoPort {
     [key: string]: string;
 }
@@ -72,6 +84,7 @@ export interface SopcInfoInterface {
     assignment?: any;
     parameter?: SopcInfoParameterSet;
     interrupt?: SopcInfoInterruptSet;
+    customInstruction?: SopcInfoCustomInstrSet;
     type: string;
     isStart: "true" | "false";
     port: SopcInfoPortSet;
@@ -151,6 +164,7 @@ export class SopcInfo {
                                 return obj;
                             });
                             break;
+                        case "customInstruction":
                         case "interrupt":
                         case "port":
                             sub = {};

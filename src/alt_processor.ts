@@ -1,7 +1,7 @@
 import { ProcessorModule } from "./module";
 import { sprintf, hex8p, dec12, hex8 } from "./sprintf";
 import * as core from "./nios2core";
-import { AvalonMaster, Interface, InterruptReceiver } from "./interface";
+import { AvalonMaster, Interface, InterruptReceiver, NiosCustomInstructionMaster } from "./interface";
 import { SopcInfoModule } from "./sopcinfo";
 import { Promiseable, then } from "./promiseable";
 
@@ -51,7 +51,7 @@ export class AlteraNios2 extends ProcessorModule {
     public dm: AvalonMaster[];
 
     /** Custom instruction services */
-    public ci: any;
+    public cim: NiosCustomInstructionMaster;
 
     /** Interrupt receiver */
     public irq: InterruptReceiver;
@@ -98,7 +98,7 @@ export class AlteraNios2 extends ProcessorModule {
     load(moddesc: SopcInfoModule): Promise<void> {
         let a = moddesc.assignment;
         let p = moddesc.parameter || {};
-        let i = moddesc["interface"];
+        let i = moddesc.interface;
         this.cfg = {
             bigEndian: (p.setting_bigEndian || <any>{}).value === "true",
             b31Bypass: (p.setting_bit31BypassDCache || <any>{}).value === "true",
@@ -122,6 +122,9 @@ export class AlteraNios2 extends ProcessorModule {
         this.dm = [(<AvalonMaster>this.loadInterface(i.data_master))];
         for (let n = 0; n < this.cfg.tcdm; ++n) {
             this.dm.push(<AvalonMaster>this.loadInterface(i[`tightly_coupled_data_master_${n}`]));
+        }
+        if (i.custom_instruction_master) {
+            this.cim = <NiosCustomInstructionMaster>this.loadInterface(i.custom_instruction_master);
         }
         if (this.cfg.debug) {
             this.loadInterface(i.debug_mem_slave);

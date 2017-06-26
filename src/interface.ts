@@ -65,12 +65,12 @@ export class Interface {
 
 interface AvalonSlaveLink {
     bridge: boolean;
-    module: string;
-    interface: string;
-    link: AvalonSlave;
+    moduleName: string;
+    interfaceName: string;
     base: number;
     size: number;
     end: number;
+    link: AvalonSlave;
 }
 
 /**
@@ -85,12 +85,12 @@ export class AvalonMaster extends Interface {
         for (let blk of ifdesc.memoryBlock) {
             let slave: AvalonSlaveLink = {
                 bridge: blk.isBridge === "true",
-                module: blk.moduleName,
-                interface: blk.slaveName,
-                link: null,
+                moduleName: blk.moduleName,
+                interfaceName: blk.slaveName,
                 base: parseInt(blk.baseAddress),
                 size: parseInt(blk.span),
-                end: null
+                end: null,
+                link: null,
             };
             slave.end = slave.base + slave.size;
             this._slaves.push(slave);
@@ -101,13 +101,12 @@ export class AvalonMaster extends Interface {
 
     connect(): void {
         for (let slave of this._slaves) {
-            let target = this.module.system.modules[slave.module];
-            this.options.printInfo(`Connecting: ${this.module.path}.${this.name} => ${target.path}.${slave.interface}`, 3);
-            slave.link = <AvalonSlave>target.interfaces[slave.interface];
+            let target = this.module.system.modules[slave.moduleName];
+            this.options.printInfo(`Connecting: ${this.module.path}.${this.name} => ${target.path}.${slave.interfaceName}`, 3);
+            slave.link = <AvalonSlave>target.interfaces[slave.interfaceName];
             if (slave.link == null) {
-                throw Error("No target slave (" + slave.module + "." + slave["interface"] + ") in this system");
+                throw Error("No target slave (" + slave.moduleName + "." + slave["interfaceName"] + ") in this system");
             }
-            (<any>slave.link).master.link = this;
         }
     }
 
@@ -205,21 +204,13 @@ export class AvalonMaster extends Interface {
 }
 Interface.register(AvalonMaster);
 
-interface MasterLink {
-    link: AvalonMaster;
-}
-
 /**
  * Avalon-MM Slave interface
  */
 export class AvalonSlave extends Interface {
     static kind = "avalon_slave";
-    private master: MasterLink;
 
     load(ifc): void {
-        this.master = {
-            link: null
-        };
         return Interface.prototype.load.call(this, ifc);
     }
 
@@ -348,10 +339,10 @@ export class Conduit extends Interface {
 Interface.register(Conduit);
 
 interface IrqSenderLink {
-    module: string;
-    interface: string;
-    link: InterruptSender;
+    moduleName: string;
+    interfaceName: string;
     irqNumber: number;
+    link: InterruptSender;
 }
 
 export class InterruptReceiver extends Interface {
@@ -365,10 +356,10 @@ export class InterruptReceiver extends Interface {
         let i = ifdesc.interrupt;
         for (let name of Object.keys(i)) {
             this._senders.push({
-                module: i[name].moduleName,
-                interface: i[name].slaveName,
+                moduleName: i[name].moduleName,
+                interfaceName: i[name].slaveName,
+                irqNumber: parseInt(i[name].interruptNumber),
                 link: null,
-                irqNumber: parseInt(i[name].interruptNumber)
             });
         }
         return Interface.prototype.load.call(this, ifdesc);
@@ -376,8 +367,8 @@ export class InterruptReceiver extends Interface {
 
     connect(): void {
         for (let sender of this._senders) {
-            let target = this.system.modules[sender.module];
-            sender.link = <InterruptSender>target.interfaces[sender.interface];
+            let target = this.system.modules[sender.moduleName];
+            sender.link = <InterruptSender>target.interfaces[sender.interfaceName];
             if (sender.link != null) {
                 sender.link.irqNumber = sender.irqNumber;
                 sender.link.receiver = this;
@@ -404,13 +395,56 @@ export class InterruptSender extends Interface {
 }
 Interface.register(InterruptSender);
 
+interface CustomInstrSlaveLink {
+    moduleName: string;
+    interfaceName: string;
+    opcodeMnemonic: string;
+    opcodeNumber: number;
+    link: NiosCustomInstructionSlave;
+}
+
 export class NiosCustomInstructionMaster extends Interface {
     static kind = "nios_custom_instruction_master";
+
+    private _slaves: CustomInstrSlaveLink[] = [];
+
+    load(ifdesc: SopcInfoInterface): void {
+        let i = ifdesc.customInstruction;
+        for (let name of Object.keys(i)) {
+            this._slaves.push({
+                moduleName: i[name].moduleName,
+                interfaceName: i[name].slaveName,
+                opcodeMnemonic: i[name].opcodeMnemonic,
+                opcodeNumber: parseInt(i[name].opcodeNumber),
+                link: null,
+            });
+        }
+        return Interface.prototype.load.call(this, ifdesc);
+    }
+
+    connect(): void {
+        for (let slave of this._slaves) {
+            let target = this.system.modules[slave.moduleName];
+            if (target != null) {
+                slave.link = <NiosCustomInstructionSlave>target.interfaces[slave.interfaceName];
+                slave.link.opcodeMnemonic = slave.opcodeMnemonic;
+                slave.link.opcodeNumber = slave.opcodeNumber;
+            }
+        }
+        return Interface.prototype.connect.call(this);
+    }
 }
 Interface.register(NiosCustomInstructionMaster);
 
 export class NiosCustomInstructionSlave extends Interface {
     static kind = "nios_custom_instruction_slave";
+
+    public opcodeMnemonic: string;
+    public opcodeNumber: number;
+
+    load(ifdesc: SopcInfoInterface): void {
+        return Interface.prototype.load.call(this, ifdesc);
+    }
 }
 Interface.register(NiosCustomInstructionSlave);
 
