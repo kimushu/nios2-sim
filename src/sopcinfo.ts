@@ -46,15 +46,35 @@ export interface SopcInfoInterfaceSet {
     [name: string]: SopcInfoInterface;
 }
 
+export interface SopcInfoInterrupt {
+    interruptNumber: string;
+    isBridge: string;
+    moduleName: string;
+    slaveName: string;
+}
+
+export interface SopcInfoInterruptSet {
+    [name: string]: SopcInfoInterrupt;
+}
+
+export interface SopcInfoPort {
+    [key: string]: string;
+}
+
+export interface SopcInfoPortSet {
+    [name: string]: SopcInfoPort;
+}
+
 export interface SopcInfoInterface {
     name: string;
     kind: string;
     version: string;
     assignment?: any;
     parameter?: SopcInfoParameterSet;
+    interrupt?: SopcInfoInterruptSet;
     type: string;
     isStart: "true" | "false";
-    port: any;
+    port: SopcInfoPortSet;
     memoryBlock?: SopcInfoMemoryBlock[];
 }
 
@@ -125,11 +145,25 @@ export class SopcInfo {
                             break;
                         case "plugin":
                         case "memoryBlock":
-                            dest[key] = value.map((plugin) => {
+                            dest[key] = value.map((item) => {
                                 let obj = {};
-                                expand(plugin, obj);
+                                expand(item, obj);
                                 return obj;
                             });
+                            break;
+                        case "interrupt":
+                        case "port":
+                            sub = {};
+                            dest[key] = sub;
+                            for (let item of value) {
+                                let obj = {};
+                                for (let key of Object.keys(item)) {
+                                    if (key !== "name") {
+                                        obj[key] = item[key][0];
+                                    }
+                                }
+                                sub[item.name[0]] = obj;
+                            }
                             break;
                         default:
                             dest[key] = value[0];

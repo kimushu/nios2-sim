@@ -1,6 +1,6 @@
 import { Module } from "./module";
 import { SopcInfoModule } from "./sopcinfo";
-import { AvalonSlave, requireInterface, InterruptSender, ClockSink } from "./interface";
+import { AvalonSlave, InterruptSender, ClockSink } from "./interface";
 
 class AlteraAvalonTimer extends Module {
     static kind = "altera_avalon_timer";
@@ -42,8 +42,8 @@ class AlteraAvalonTimer extends Module {
         this._snapshot = 0;
 
         let i = moddesc.interface;
-        this.irq = requireInterface(this.loadInterface(i.irq), InterruptSender);
-        this.s1 = requireInterface(this.loadInterface(i.s1), AvalonSlave);
+        this.irq = <InterruptSender>this.loadInterface(i.irq);
+        this.s1 = <AvalonSlave>this.loadInterface(i.s1);
         this.s1.readReg = this._readReg.bind(this);
         this.s1.writeReg = this._writeReg.bind(this);
         return Module.prototype.load.call(this, moddesc);

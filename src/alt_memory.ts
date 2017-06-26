@@ -1,5 +1,5 @@
 import { Module } from "./module";
-import { AvalonSlave, Interface, requireInterface } from "./interface";
+import { AvalonSlave, Interface } from "./interface";
 import { SopcInfoModule } from "./sopcinfo";
 
 class MemoryDevice extends Module {
@@ -23,9 +23,9 @@ class MemoryDevice extends Module {
         }
         this.buffer = new ArrayBuffer(this.size);
         this.i32 = new Int32Array(this.buffer);
-        this.s1 = requireInterface(this.loadInterface(i[s1name]), AvalonSlave);
+        this.s1 = <AvalonSlave>this.loadInterface(i[s1name]);
         if (this.dualPort) {
-            this.s2 = requireInterface(this.loadInterface(i[s2name]), AvalonSlave);
+            this.s2 = <AvalonSlave>this.loadInterface(i[s2name]);
         }
         return Module.prototype.load.call(this, moddesc);
     }

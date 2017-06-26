@@ -1,7 +1,7 @@
 import { ProcessorModule } from "./module";
 import { sprintf, hex8p, dec12, hex8 } from "./sprintf";
 import * as core from "./nios2core";
-import { AvalonMaster, Interface } from "./interface";
+import { AvalonMaster, Interface, InterruptReceiver } from "./interface";
 import { SopcInfoModule } from "./sopcinfo";
 import { Promiseable, then } from "./promiseable";
 
@@ -49,6 +49,9 @@ class AlteraNios2 extends ProcessorModule {
 
     /** Data masters */
     public dm: AvalonMaster[];
+
+    /** Interrupt receiver */
+    public irq: InterruptReceiver;
 
     /** status register */
     public status: number;
@@ -109,17 +112,18 @@ class AlteraNios2 extends ProcessorModule {
             tcim: parseInt((p.icache_numTCIM || <any>{}).value || 0),
             tcdm: parseInt((p.dcache_numTCDM || <any>{}).value || 0)
         };
-        this.im = [<AvalonMaster>this.loadInterface(i.instruction_master)];
+        this.im = [(<AvalonMaster>this.loadInterface(i.instruction_master))];
         for (let n = 0; n < this.cfg.tcim; ++n) {
-            this.im.push(<AvalonMaster>this.loadInterface(i["tightly_coupled_instruction_master_" + n]));
+            this.im.push(<AvalonMaster>this.loadInterface(i[`tightly_coupled_instruction_master_${n}`]));
         }
-        this.dm = [<AvalonMaster>this.loadInterface(i.data_master)];
+        this.dm = [(<AvalonMaster>this.loadInterface(i.data_master))];
         for (let n = 0; n < this.cfg.tcdm; ++n) {
-            this.dm.push(<AvalonMaster>this.loadInterface(i["tightly_coupled_data_master_" + n]));
+            this.dm.push(<AvalonMaster>this.loadInterface(i[`tightly_coupled_data_master_${n}`]));
         }
         if (this.cfg.debug) {
             this.loadInterface(i.debug_mem_slave);
         }
+        this.irq = <InterruptReceiver>this.loadInterface(i.irq);
         let summary = [];
         if (this.cfg.icache > 0) {
             summary.push(`ICache=${this.cfg.icache / 1024}k`);
