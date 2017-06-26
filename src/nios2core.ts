@@ -730,6 +730,9 @@ def(0x2e3a, TYPE_R, function (ra: number, rb: number, rc: number, opx: number) {
         case 3:
             this.ienable = this.gpr[ra];
             return;
+        case 4:
+            // writing ipending has no effect
+            return;
     }
     throw 0;
 }, function (ra: number, rb: number, rc: number, opx: number) {
