@@ -303,6 +303,11 @@ export class AvalonSlave extends Interface {
         throw new Error(`Unsupported write access to offset ${offset}`);
     }
 
+    /**
+     * Write 32-bit register (for CSR)
+     * @param offset Register offset
+     * @param value 32-bit value
+     */
     writeReg: (this: AvalonSlave, offset: number, value: number) => Promiseable<boolean>;
 }
 Interface.register(AvalonSlave);

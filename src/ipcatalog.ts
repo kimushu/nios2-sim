@@ -53,9 +53,8 @@ class DummyModule extends Module {
             let i = this.loadInterface(moddesc.interface[name]);
             if (i instanceof AvalonSlave) {
                 // Avalon slave of dummy module always return zero
-                i.read32 = (offset: number, count?: number) => {
-                    return new Int32Array((count != null) ? count : 1);
-                };
+                i.readReg = () => 0;
+                i.writeReg = () => false;
             }
         }
         return Module.prototype.load.call(this, moddesc);
