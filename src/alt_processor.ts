@@ -23,7 +23,7 @@ interface Nios2BreakpointSet {
     [addr: number]: Nios2Breakpoint;
 }
 
-class AlteraNios2 extends ProcessorModule {
+export class AlteraNios2 extends ProcessorModule {
     static kind = "altera_nios2_qsys";
 
     /** Processor configuration */
@@ -49,6 +49,9 @@ class AlteraNios2 extends ProcessorModule {
 
     /** Data masters */
     public dm: AvalonMaster[];
+
+    /** Custom instruction services */
+    public ci: any;
 
     /** Interrupt receiver */
     public irq: InterruptReceiver;
