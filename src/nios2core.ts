@@ -714,19 +714,22 @@ def(0x263a, TYPE_R, function (this: AlteraNios2, ra: number, rb: number, rc: num
     n = opx & 0x1f;
     switch (n) {
         case 0:
-            this.gpr[ra] = this.status;
+            this.gpr[rc] = this.status;
             return;
         case 1:
-            this.gpr[ra] = this.estatus;
+            this.gpr[rc] = this.estatus;
             return;
         case 2:
-            this.gpr[ra] = this.bstatus;
+            this.gpr[rc] = this.bstatus;
             return;
         case 3:
-            this.gpr[ra] = this.ienable;
+            this.gpr[rc] = this.ienable;
             return;
         case 4:
-            this.gpr[ra] = this.ipending;
+            this.gpr[rc] = this.irq.pending;
+            return;
+        case 5:
+            this.gpr[rc] = this.cfg.cpuid;
             return;
     }
     throw 0;
@@ -781,8 +784,10 @@ def(0x2e3a, TYPE_R, function (this: AlteraNios2, ra: number, rb: number, rc: num
         case 3:
             this.ienable = this.gpr[ra];
             return;
-        case 4:
-            // writing ipending has no effect
+        case 4: // ipending
+        case 5: // cpuid
+        case 7: // exception
+            // ignored (no effect)
             return;
     }
     throw 0;
