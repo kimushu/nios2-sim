@@ -36,6 +36,13 @@ export class Interface {
     }
 }
 
+export function requireInterface(i: Interface, c: InterfaceConstructor): any {
+    if (i instanceof c) {
+        return i;
+    }
+    throw new Error(`slave "${(<Interface>i).name}" is not ${c.name} interface`);
+}
+
 interface SlaveLink {
     bridge: boolean;
     module: string;
@@ -159,27 +166,34 @@ export class AvalonSlave extends Interface {
         return Interface.prototype.load.call(this, ifc);
     }
 
-    read8(offset: number, bytes?: number): Promiseable<Int8Array> {
+    read8(offset: number, count?: number): Promiseable<Int8Array> {
         let boff = offset & 3;
         let off32 = offset >>> 2;
-        let cnt32 = (bytes != null) ? ((boff + bytes + 3) >>> 2): null;
+        let cnt32 = (count != null) ? ((boff + count + 3) >>> 2): null;
         return then(
             this.read32(off32, cnt32),
             (i32) => new Int8Array(i32.buffer, i32.byteOffset + boff, i32.byteLength - boff)
         );
     }
 
-    read16(offset: number, bytes?: number): Promiseable<Int16Array> {
+    read16(offset: number, count?: number): Promiseable<Int16Array> {
         let woff = offset & 1;
         let off32 = offset >>> 1;
-        let cnt32 = (bytes != null) ? ((woff + bytes + 1) >>> 1) : null;
+        let cnt32 = (count != null) ? ((woff + count + 1) >>> 1) : null;
         return then(
             this.read32(off32, cnt32),
             (i32) => new Int16Array(i32.buffer, i32.byteOffset + woff * 2, i32.byteLength - woff * 2)
         );
     }
 
-    read32: (this: AvalonSlave, offset: number, bytes?: number) => Promiseable<Int32Array>;
+    read32(offset: number, count?: number): Promiseable<Int32Array> {
+        let value = this.readReg(offset);
+        if (value != null) {
+            return then(value, (value) => new Int32Array([value]));
+        }
+    }
+
+    readReg: (this: AvalonSlave, offset: number) => Promiseable<number>;
 
     write8(offset: number, value: number): Promiseable<boolean> {
         let shift = ((offset & 3) << 3);
@@ -191,7 +205,14 @@ export class AvalonSlave extends Interface {
         return this.write32(offset >>> 1, value <<shift, 0xffff << shift);
     }
 
-    write32: (this: AvalonSlave, offset: number, value: number, byteEnable?: number) => Promiseable<boolean>;
+    write32(offset: number, value: number, byteEnable: number = 0xffffffff): Promiseable<boolean> {
+        if (byteEnable === 0xffffffff) {
+            return this.writeReg(offset, value);
+        }
+        throw new Error(`Unsupported write access to offset ${offset}`);
+    }
+
+    writeReg: (this: AvalonSlave, offset: number, value: number) => Promiseable<boolean>;
 }
 Interface.register(AvalonSlave);
 
@@ -207,6 +228,16 @@ Interface.register(AvalonSource);
 
 export class ClockSink extends Interface {
     static kind = "clock_sink";
+
+    public clockRate: number;
+
+    load(ifdesc: SopcInfoInterface): Promise<void> {
+        let rate = ifdesc.parameter.clockRate;
+        if (rate != null) {
+            this.clockRate = parseInt(rate.value);
+        }
+        return Interface.prototype.load.call(this, ifdesc);
+    }
 }
 Interface.register(ClockSink);
 
