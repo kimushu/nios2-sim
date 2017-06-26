@@ -14,7 +14,8 @@
                 "--ignore-unknown",
                 //"--no-plugin",
                 "--cpu-trace",
-                "--break-js=0xf00d218",
+                "--break-js=0xf001608",
+                "--empty-func=alt_busy_sleep:0",
                 "--swi-uid=1234",
                 "-vvv"
             ],

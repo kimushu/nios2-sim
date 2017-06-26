@@ -1,4 +1,4 @@
-import { ProcessorModule } from "./module";
+import { ProcessorModule, ProcessorTimer } from "./module";
 import { sprintf, hex8p, dec12, hex8 } from "./sprintf";
 import * as core from "./nios2core";
 import { AvalonMaster, Interface, InterruptReceiver, NiosCustomInstructionMaster } from "./interface";
@@ -24,6 +24,11 @@ interface Nios2BreakpointSet {
     [addr: number]: Nios2Breakpoint;
 }
 
+interface Nios2Timer {
+    cycles: number;
+    listener: Function;
+}
+
 export class AlteraNios2 extends ProcessorModule {
     static kind = "altera_nios2_qsys";
 
@@ -43,6 +48,8 @@ export class AlteraNios2 extends ProcessorModule {
         dline: number;
         tcim: number;
         tcdm: number;
+        cpuid: number;
+        clockRate: number;
     };
 
     /** Instruction masters */
@@ -69,17 +76,11 @@ export class AlteraNios2 extends ProcessorModule {
     /** ienable register */
     public ienable: number;
 
-    /** ipending register */
-    public ipending: number;
-
     /** Instruction pointer */
     public pc: number;
 
     /** General purpose registers */
     public gpr: Int32Array;
-
-    /** FIXME: Exception vector? */
-    public excc: number;
 
     /** FIXME: Total instructions executed */
     public icnt: number;
@@ -90,11 +91,17 @@ export class AlteraNios2 extends ProcessorModule {
     /** Current index in instruction word array */
     public iidx: number;
 
+    /** Clock rate */
+    get clockRate() { return this.cfg.clockRate; }
+
     /** Current state */
     private _state: Nios2State = Nios2State.NOT_INITIALIZED;
 
     /** Breakpoints */
     private _bkpt: Nios2BreakpointSet = {};
+
+    /** Timers */
+    private _timers: Nios2Timer[] = [];
 
     load(moddesc: SopcInfoModule): Promise<void> {
         let a = moddesc.assignment;
@@ -114,7 +121,9 @@ export class AlteraNios2 extends ProcessorModule {
             dcache: parseInt(a.embeddedsw.CMacro.DCACHE_SIZE || 0),
             dline: parseInt(a.embeddedsw.CMacro.DCACHE_LINE_SIZE || 0),
             tcim: parseInt((p.icache_numTCIM || <any>{}).value || 0),
-            tcdm: parseInt((p.dcache_numTCDM || <any>{}).value || 0)
+            tcdm: parseInt((p.dcache_numTCDM || <any>{}).value || 0),
+            cpuid: parseInt(a.embeddedsw.CMacro.CPUID_VALUE || 0),
+            clockRate: parseInt(i.clk.parameter.clockRate.value),
         };
         this.im = [(<AvalonMaster>this.loadInterface(i.instruction_master))];
         for (let n = 0; n < this.cfg.tcim; ++n) {
@@ -189,11 +198,10 @@ export class AlteraNios2 extends ProcessorModule {
         this.status = 0;
         this.estatus = 0;
         this.bstatus = 0;
-        this.ipending = 0;
-        this.excc = 0;
         this.pc = this.cfg.rvec;
         this.gpr = new Int32Array(32);
         this.gpr.fill(0xdeadbeef, 1);
+        this.cycles = 0;
         this.icnt = 0;
         this.inst = null;
         this.iidx = null;
@@ -213,9 +221,22 @@ export class AlteraNios2 extends ProcessorModule {
         let total: number;
         this._state = Nios2State.RUNNING;
         for (total = 0; steps > 0; ++total, --steps) {
-            let iw;
+            // Internal interrupt check
+            if ((this.status & 1) && (this.irq.pending & this.ienable)) {
+                if (!(this.status & 4)) {
+                    this.estatus = this.status;
+                }
+                this.status &= ~1;
+                this.gpr[29] = this.pc;
+                this.pc = this.cfg.evec;
+                this.inst = null;
+                if (this.options.cpuTrace) {
+                    console.log(`(${dec12(this.icnt)}) [Internal interrupt]`);
+                }
+            }
 
             // Load instruction word
+            let iw;
             for (;;) {
                 iw = (this.inst || [])[this.iidx];
                 if (iw != null) {
@@ -269,6 +290,9 @@ export class AlteraNios2 extends ProcessorModule {
             }
 
             if (bkpt) {
+                if (this.options.cpuTrace) {
+                    console.log(`(${dec12(this.icnt)}) [Breakpoint]`);
+                }
                 if (bkpt.js) {
                     debugger;
                 }
@@ -283,7 +307,7 @@ export class AlteraNios2 extends ProcessorModule {
                     return this._cpu_finish(newpc);
                 })
                 .then(() => {
-                    return total;
+                    return total + 1;
                 });
             }
 
@@ -295,8 +319,31 @@ export class AlteraNios2 extends ProcessorModule {
         return Promise.resolve(total);
     }
 
+    addTimer(cycles: number, listener: Function): ProcessorTimer {
+        let timer: Nios2Timer = { cycles, listener };
+        this._timers.push(timer);
+        return { clear: () => {
+            timer.cycles = -1;
+        }};
+    }
+
     private _cpu_finish(newpc: number): Promiseable<never> {
         this.gpr[0] = 0;
+        ++this.cycles;
+
+        let expired = false;
+        for (let timer of this._timers) {
+            if (timer.cycles <= 0) {
+                expired = true;
+            } else if (--timer.cycles === 0) {
+                timer.listener();
+                expired = true;
+            }
+        }
+        if (expired) {
+            this._timers = this._timers.filter((timer) => timer.cycles > 0);
+        }
+
         ++this.icnt;
         if (newpc != null) {
             // Jump

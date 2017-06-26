@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as colors from "colors";
 import { Qsys } from "./qsys";
 
+/**
+ * Maximum steps executed in one Node.js tick cycle
+ */
+const STEPS_PER_TICK = 256;
+
 export interface AddressSpec {
     name?: string;
     value: number;
@@ -81,26 +86,38 @@ export interface ElfSymbol {
     func?: boolean;
 }
 
+/**
+ * NiosII simulator class
+ */
 export class Simulator {
+    /** System (Qsys) */
     public system: Qsys;
+
+    /** Simulator options */
     public options: SimulatorOptions;
+
+    /** Loaded program image */
     public image: ElfImage;
+
+    /** Loaded symbols */
     public symbols: ElfSymbol[];
 
+    /**
+     * Construct instance
+     */
     constructor() {
     }
 
+    /**
+     * Run simulator
+     * @param argv arguments
+     */
     run(argv: string[]) {
         return Promise.resolve().then(() => {
-            return this.parseOptions(argv);
-        })
-        .then(() => {
-            return this.loadExecutable(this.options.args[0]);
-        })
-        .then(() => {
-            return this.resolveSymbols();
-        })
-        .then(() => {
+            this.parseOptions(argv);
+            this.loadExecutable(this.options.args[0]);
+            this.loadSymbols();
+            this.resolveSymbols();
             return this.loadSystem();
         })
         .then(() => {
@@ -111,8 +128,8 @@ export class Simulator {
         })
         .then(() => {
             let run = () => {
-                this.system.cpu.runProcessor()
-                .then(() => {
+                return this.system.cpu.runProcessor(STEPS_PER_TICK)
+                .then((value) => {
                     return run();
                 });
             };
@@ -192,7 +209,9 @@ export class Simulator {
         elfy.constants.machine[113] = "altera_nios2";
         elfy.constants.entryType[0x63700101] = "lz4-load";
         this.image = elfy.parse(fs.readFileSync(exec));
+    }
 
+    loadSymbols(): void {
         this.symbols = [];
         let strtab: Uint8Array = (this.image.body.sections.find((s) => s.name === ".strtab") || <any>{}).data;
         let symtab = Buffer.from((this.image.body.sections.find((s) => s.name === ".symtab") || <any>{}).data || []);

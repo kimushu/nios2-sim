@@ -781,6 +781,9 @@ def(0x2e3a, TYPE_R, function (this: AlteraNios2, ra: number, rb: number, rc: num
         case 0:
             this.status = this.gpr[ra];
             return;
+        case 1:
+            this.estatus = this.gpr[ra];
+            return;
         case 3:
             this.ienable = this.gpr[ra];
             return;

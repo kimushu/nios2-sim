@@ -42,7 +42,22 @@ export class Module {
     }
 }
 
+export interface ProcessorTimer {
+    /**
+     * Clear timer
+     */
+    clear: () => void;
+}
+
 export class ProcessorModule extends Module {
+    /** Cycle counter (approx.) */
+    public cycles: number;
+
+    /** Clock rate (in Hz) */
+    get clockRate(): number {
+        throw new Error("pure function");
+    }
+
     loadProgram(addr: number, data: Buffer): Promise<void> {
         return Promise.reject(new Error("pure function"));
     }
@@ -51,6 +66,9 @@ export class ProcessorModule extends Module {
     }
     runProcessor(steps?: number): Promise<number> {
         return Promise.reject(new Error("pure function"));
+    }
+    addTimer(cycles: number, listener: Function): ProcessorTimer {
+        throw new Error("pure function");
     }
 }
 

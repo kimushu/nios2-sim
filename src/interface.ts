@@ -348,7 +348,7 @@ interface IrqSenderLink {
 export class InterruptReceiver extends Interface {
     static kind = "interrupt_receiver";
 
-    public request: number = 0;
+    public pending: number = 0;
 
     private _senders: IrqSenderLink[] = [];
 
@@ -378,11 +378,11 @@ export class InterruptReceiver extends Interface {
     }
 
     assert(irqNumber: number): void {
-        this.request |= (1 << irqNumber);
+        this.pending |= (1 << irqNumber);
     }
 
     deassert(irqNumber: number): void {
-        this.request &= ~(1 << irqNumber);
+        this.pending &= ~(1 << irqNumber);
     }
 }
 Interface.register(InterruptReceiver);
@@ -392,6 +392,14 @@ export class InterruptSender extends Interface {
 
     public receiver: InterruptReceiver;
     public irqNumber: number;
+
+    assert(): void {
+        this.receiver.assert(this.irqNumber);
+    }
+
+    deassert(): void {
+        this.receiver.deassert(this.irqNumber);
+    }
 }
 Interface.register(InterruptSender);
 

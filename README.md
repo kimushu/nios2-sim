@@ -8,6 +8,7 @@
   - Multiply instructions (mul, muli)
   - Custom instructions
   - Floating point by FPU2
+  - Internal interrupts
 - System emulation
   - ELF loading
   - Symbol loading
