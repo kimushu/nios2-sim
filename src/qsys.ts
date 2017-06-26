@@ -148,6 +148,9 @@ export class Qsys {
                 if (!(p.type === "load" || p.type === "lz4-load")) {
                     return promise;
                 }
+                if (p.vaddr === 0) {
+                    return promise;
+                }
                 return promise
                 .then(() => {
                     let ba = p.paddr;
