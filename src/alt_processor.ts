@@ -51,16 +51,19 @@ class AlteraNios2 extends ProcessorModule {
     public dm: AvalonMaster[];
 
     /** status register */
-    public sts: number;
+    public status: number;
 
     /** estatus register */
-    public est: number;
+    public estatus: number;
 
     /** bstatus register */
-    public bst: number;
+    public bstatus: number;
+
+    /** ienable register */
+    public ienable: number;
 
     /** ipending register */
-    public ipend: number;
+    public ipending: number;
 
     /** Instruction pointer */
     public pc: number;
@@ -168,10 +171,10 @@ class AlteraNios2 extends ProcessorModule {
     }
 
     resetProcessor(): void {
-        this.sts = 0;
-        this.est = 0;
-        this.bst = 0;
-        this.ipend = 0;
+        this.status = 0;
+        this.estatus = 0;
+        this.bstatus = 0;
+        this.ipending = 0;
         this.excc = 0;
         this.pc = this.cfg.rvec;
         this.gpr = new Int32Array(32);
@@ -293,6 +296,18 @@ class AlteraNios2 extends ProcessorModule {
 
     ioread32(addr: number): Promiseable<number> {
         return this.dread32(addr);
+    }
+
+    iowrite8(addr: number, value: number): Promiseable<boolean> {
+        return this.dwrite8(addr, value);
+    }
+
+    iowrite16(addr: number, value: number): Promiseable<boolean> {
+        return this.dwrite16(addr, value);
+    }
+
+    iowrite32(addr: number, value: number): Promiseable<boolean> {
+        return this.dwrite32(addr, value);
     }
 
     dwrite8(addr: number, value: number): Promiseable<boolean> {

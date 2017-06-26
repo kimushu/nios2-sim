@@ -280,7 +280,7 @@ def(0x18, TYPE_I, function (ra: number, rb: number, s16: number) {
 def(0x1b, TYPE_I, function (ra: number, rb: number, s16: number) {
     throw 0;
 }, function (ra: number, rb: number, s16: number) {
-    return D_OR("flashda", s16, ra);
+    return D_OR("flushda", s16, ra);
 });
 
 def(0x1c, TYPE_I, function (ra: number, rb: number, s16: number) {
@@ -397,7 +397,7 @@ def(0x32, TYPE_R, function (ra: number, rb: number, rc: number, opx: number) {
 });
 
 def(0x33, TYPE_I, function (ra: number, rb: number, s16: number) {
-    throw 0;
+    return; // FIXME
 }, function (ra: number, rb: number, s16: number) {
     return D_OR("initd", s16, ra);
 });
@@ -438,9 +438,9 @@ def(0x38, TYPE_I, function (ra: number, rb: number, s16: number) {
 });
 
 def(0x3b, TYPE_I, function (ra: number, rb: number, s16: number) {
-    throw 0;
+    return; // FIXME
 }, function (ra: number, rb: number, s16: number) {
-    return D_OR("flashd", s16, ra);
+    return D_OR("flushd", s16, ra);
 });
 
 def(0x3c, TYPE_I, function (ra: number, rb: number, s16: number) {
@@ -450,7 +450,7 @@ def(0x3c, TYPE_I, function (ra: number, rb: number, s16: number) {
 });
 
 def(0x013a, TYPE_R, function (ra: number, rb: number, rc: number) {
-    this.st = this.est;
+    this.status = this.estatus;
     return this.gpr[EA];
 }, function (ra: number, rb: number, rc: number) {
     return D_N("eret");
@@ -477,9 +477,9 @@ def(0x033a, TYPE_R, function (ra: number, rb: number, rc: number) {
 });
 
 def(0x043a, TYPE_R, function () {
-    throw 0;
+    return;
 }, function () {
-    return D_N("flashp");
+    return D_N("flushp");
 });
 
 def(0x053a, TYPE_R, function () {
@@ -526,9 +526,9 @@ def(0x0b3a, TYPE_R, function (ra: number, rb: number, rc: number) {
 });
 
 def(0x0c3a, TYPE_R, function (ra) {
-    throw 0;
+    return; // FIXME
 }, function (ra) {
-    return D_R("flashi", ra);
+    return D_R("flushi", ra);
 });
 
 def(0x0d3a, TYPE_R, function (ra) {
@@ -661,6 +661,23 @@ def(0x253a, TYPE_R, function (ra: number, rb: number, rc: number) {
 def(0x263a, TYPE_R, function (ra: number, rb: number, rc: number, opx: number) {
     let n;
     n = opx & 0x1f;
+    switch (n) {
+        case 0:
+            this.gpr[ra] = this.status;
+            return;
+        case 1:
+            this.gpr[ra] = this.estatus;
+            return;
+        case 2:
+            this.gpr[ra] = this.bstatus;
+            return;
+        case 3:
+            this.gpr[ra] = this.ienable;
+            return;
+        case 4:
+            this.gpr[ra] = this.ipending;
+            return;
+    }
     throw 0;
 }, function (ra: number, rb: number, rc: number, opx: number) {
     let n;
@@ -695,8 +712,8 @@ def(0x293a, TYPE_R, function (ra) {
 });
 
 def(0x2d3a, TYPE_R, function () {
-    this.est = this.st;
-    this.st &= ~3;
+    this.estatus = this.status;
+    this.status &= ~3;
     this.gpr[EA] = this.pc + 4;
     return this.cfg.evec;
 }, function (ra: number, rb: number, rc: number, opx: number) {
@@ -708,7 +725,10 @@ def(0x2e3a, TYPE_R, function (ra: number, rb: number, rc: number, opx: number) {
     n = opx & 0x1f;
     switch (n) {
         case 0:
-            this.sts = this.gpr[ra];
+            this.status = this.gpr[ra];
+            return;
+        case 3:
+            this.ienable = this.gpr[ra];
             return;
     }
     throw 0;
