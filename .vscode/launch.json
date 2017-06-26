@@ -10,11 +10,12 @@
             "name": "プログラムの起動",
             "args": [
                 "${workspaceRoot}/bin/nios2-sim",
-                "${workspaceRoot}/test/olive_rubic_duktape.elf",
+                "${workspaceRoot}/test/test_max10.elf",
                 "--ignore-unknown",
                 //"--no-plugin",
                 "--cpu-trace",
-                "--break-js", "0xf0002f8",
+                "--break-js=0xf00d218",
+                "--swi-uid=1234",
                 "-vvv"
             ],
             "outFiles": [
