@@ -17,6 +17,7 @@ enum Nios2State {
 
 interface Nios2Breakpoint {
     js?: boolean;
+    empty?: number;
 }
 
 interface Nios2BreakpointSet {
@@ -149,9 +150,13 @@ export class AlteraNios2 extends ProcessorModule {
             summary.push("hw-mulx");
         }
         this.options.printInfo(`[${this.path}] NiosII processor (${summary.join(", ")})`, 2);
-        for (let addr of this.options.breakJs) {
-            this.options.printInfo(`[${this.path}] Breakpoint (JS) set at ${hex8p(addr)}`);
-            this._bkpt[addr] = { js: true };
+        for (let bkpt of this.options.breakJs) {
+            this.options.printInfo(`[${this.path}] Breakpoint (JS) set at ${bkpt.name || ""}(${hex8p(bkpt.value)})`);
+            this._bkpt[bkpt.value] = { js: true };
+        }
+        for (let empf of this.options.emptyFunc) {
+            this.options.printInfo(`[${this.path}] Empty function set at ${empf.name || ""}(${hex8p(empf.value)})`);
+            this._bkpt[empf.value] = { empty: (empf.result != null) ? empf.result : null };
         }
         return ProcessorModule.prototype.load.call(this, moddesc);
     }
@@ -240,13 +245,29 @@ export class AlteraNios2 extends ProcessorModule {
                 }
             }
 
+            // Breakpoint check
+            let bkpt = this._bkpt[this.pc];
+            if (bkpt && bkpt.empty !== undefined) {
+                // Empty function
+                if (this.options.cpuTrace) {
+                    console.log(`(${dec12(this.icnt)}) ${hex8(this.pc)}: xxxxxxxx\tsimret\t${
+                        (bkpt.empty != null) ? bkpt.empty : "(void)"}`);
+                }
+                if (bkpt.empty != null) {
+                    this.gpr[2] = bkpt.empty;
+                }
+                let result = this._cpu_finish(this.gpr[31]);
+                if (result != null) {
+                    return result;
+                }
+                continue;
+            }
+
             // Trace
             if (this.options.cpuTrace) {
                 console.log(`(${dec12(this.icnt)}) ${hex8(this.pc)}: ${hex8(iw)}\t${this._cpu_disas(iw)}`);
             }
 
-            // Breakpoint check
-            let bkpt = this._bkpt[this.pc];
             if (bkpt) {
                 if (bkpt.js) {
                     debugger;
@@ -265,6 +286,7 @@ export class AlteraNios2 extends ProcessorModule {
                     return total;
                 });
             }
+
             let result = this._cpu_finish(newpc);
             if (result != null) {
                 return result;
@@ -297,30 +319,31 @@ export class AlteraNios2 extends ProcessorModule {
     private _cpu_disas = core.disas;
 
     ioread8(addr: number): Promiseable<number> {
-        return this.dread8(addr);
+        return this.dread8(addr | 0x80000000);
     }
 
     ioread16(addr: number): Promiseable<number> {
-        return this.dread16(addr);
+        return this.dread16(addr | 0x80000000);
     }
 
     ioread32(addr: number): Promiseable<number> {
-        return this.dread32(addr);
+        return this.dread32(addr | 0x80000000);
     }
 
     iowrite8(addr: number, value: number): Promiseable<boolean> {
-        return this.dwrite8(addr, value);
+        return this.dwrite8(addr | 0x80000000, value);
     }
 
     iowrite16(addr: number, value: number): Promiseable<boolean> {
-        return this.dwrite16(addr, value);
+        return this.dwrite16(addr | 0x80000000, value);
     }
 
     iowrite32(addr: number, value: number): Promiseable<boolean> {
-        return this.dwrite32(addr, value);
+        return this.dwrite32(addr | 0x80000000, value);
     }
 
     dwrite8(addr: number, value: number): Promiseable<boolean> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.write8(addr, value);
             if (result != null) {
@@ -328,11 +351,12 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 8-bit data write addr=0x${addr.toString(16)}`)
+            new Error(`invalid 8-bit data write addr=${hex8p(addr)}`)
         );
     }
 
     dwrite16(addr: number, value: number): Promiseable<boolean> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.write16(addr, value);
             if (result != null) {
@@ -340,11 +364,12 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 16-bit data write addr=0x${addr.toString(16)}`)
+            new Error(`invalid 16-bit data write addr=${hex8p(addr)}`)
         );
     }
 
     dwrite32(addr: number, value: number): Promiseable<boolean> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.write32(addr, value);
             if (result != null) {
@@ -352,11 +377,12 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 32-bit data write addr=0x${addr.toString(16)}`)
+            new Error(`invalid 32-bit data write addr=${hex8p(addr)}`)
         );
     }
 
     dread8(addr: number): Promiseable<number> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.read8(addr, 1);
             if (result != null) {
@@ -364,11 +390,12 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 8-bit data read addr=0x${addr.toString(16)}`)
+            new Error(`invalid 8-bit data read addr=${hex8p(addr)}`)
         );
     }
 
     dread16(addr: number): Promiseable<number> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.read16(addr, 2);
             if (result != null) {
@@ -376,11 +403,12 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 16-bit data read addr=0x${addr.toString(16)}`)
+            new Error(`invalid 16-bit data read addr=${hex8p(addr)}`)
         );
     }
 
     dread32(addr: number): Promiseable<number> {
+        addr = (addr & 0x7fffffff) >>> 0;
         for (let dm of this.dm) {
             let result = dm.read32(addr, 4);
             if (result != null) {
@@ -388,7 +416,7 @@ export class AlteraNios2 extends ProcessorModule {
             }
         }
         return Promise.reject(
-            new Error(`invalid 32-bit data read addr=0x${addr.toString(16)}`)
+            new Error(`invalid 32-bit data read addr=${hex8p(addr)}`)
         );
     }
 }

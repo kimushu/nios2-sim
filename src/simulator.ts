@@ -2,12 +2,25 @@ import * as fs from "fs";
 import * as colors from "colors";
 import { Qsys } from "./qsys";
 
+export interface AddressSpec {
+    name?: string;
+    value: number;
+}
+
+export interface BreakpointSpec extends AddressSpec {
+}
+
+export interface EmptyFuncSpec extends AddressSpec {
+    result: number;
+}
+
 export interface SimulatorOptions {
     sopcinfo: string;
     ignoreUnknown: boolean;
     cpuTrace: boolean;
     plugin: boolean;
-    breakJs: number[];
+    breakJs: BreakpointSpec[];
+    emptyFunc: EmptyFuncSpec[];
     verbose: number;
     args: string[];
     printInfo: (message: string, verbosity?: number) => void;
@@ -61,10 +74,18 @@ export interface ElfImage {
     };
 }
 
+export interface ElfSymbol {
+    name: string;
+    value: number;
+    data?: boolean;
+    func?: boolean;
+}
+
 export class Simulator {
     public system: Qsys;
     public options: SimulatorOptions;
     public image: ElfImage;
+    public symbols: ElfSymbol[];
 
     constructor() {
     }
@@ -75,6 +96,9 @@ export class Simulator {
         })
         .then(() => {
             return this.loadExecutable(this.options.args[0]);
+        })
+        .then(() => {
+            return this.resolveSymbols();
         })
         .then(() => {
             return this.loadSystem();
@@ -127,11 +151,24 @@ export class Simulator {
         .option("--ignore-unknown", "Ignore unknown components")
         .option("--cpu-trace", "Show CPU trace")
         .option("--no-plugin", "Disable plugins")
-        .option("--break-js <addr>", "Set JS breakpoint", (v, t) => {
-            t.push(parseInt(v));
+        .option("--break-js <addr>", "Set JS breakpoint", (v: string, t: BreakpointSpec[]) => {
+            if (v.match(/^\d/)) {
+                t.push({ value: parseInt(v) });
+            } else {
+                t.push({ name: v, value: null });
+            }
             return t;
         }, [])
-        .option("-v, --verbose", "Increase verbosity", (v, t) => (t + 1), 0)
+        .option("--empty-func <addr>[:<result>]", "Empty function", (v: string, t: EmptyFuncSpec[]) => {
+            let [ n, r ] = v.split(":", 2);
+            if (n.match(/^\d/)) {
+                t.push({ value: parseInt(n), result: (r != null) ? parseInt(r) : null });
+            } else {
+                t.push({ name: n, value: null, result: (r != null) ? parseInt(r) : null });
+            }
+            return t;
+        }, [])
+        .option("-v, --verbose", "Increase verbosity", (v: any, t: number) => (t + 1), 0)
         .parse(argv);
         if (program.args.length === 0) {
             program.printErr("No executable specified");
@@ -155,6 +192,44 @@ export class Simulator {
         elfy.constants.machine[113] = "altera_nios2";
         elfy.constants.entryType[0x63700101] = "lz4-load";
         this.image = elfy.parse(fs.readFileSync(exec));
+
+        this.symbols = [];
+        let strtab: Uint8Array = (this.image.body.sections.find((s) => s.name === ".strtab") || <any>{}).data;
+        let symtab = Buffer.from((this.image.body.sections.find((s) => s.name === ".symtab") || <any>{}).data || []);
+        for (let i = 0; i < symtab.length; i += 16) {
+            let st_name  = symtab.readUInt32LE(i + 0);
+            let st_value = symtab.readUInt32LE(i + 4);
+            let st_size  = symtab.readUInt32LE(i + 8);
+            let st_info  = symtab.readUInt8(i + 12);
+            let st_other = symtab.readUInt8(i + 13);
+            let st_shndx = symtab.readUInt16LE(i + 14);
+            let nulIndex = strtab.indexOf(0, st_name);
+            let name = String.fromCharCode.apply(null, strtab.subarray(st_name, nulIndex));
+            let sym: ElfSymbol = { name, value: st_value };
+            switch (st_info & 0xf) {
+                case 1: // STT_OBJECT
+                    sym.data = true;
+                    this.symbols.push(sym);
+                    break;
+                case 2: // STT_FUNC
+                    sym.func = true;
+                    this.symbols.push(sym);
+                    break;
+            }
+        }
+    }
+
+    resolveSymbols(): void {
+        for (let brk of this.options.breakJs) {
+            if (brk.name != null) {
+                brk.value = this.symbols.find((sym) => sym.func && sym.name === brk.name).value;
+            }
+        }
+        for (let emp of this.options.emptyFunc) {
+            if (emp.name != null) {
+                emp.value = this.symbols.find((sym) => sym.func && sym.name === emp.name).value;
+            }
+        }
     }
 
     loadSystem(): Promise<void> {
