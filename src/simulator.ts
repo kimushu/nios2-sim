@@ -7,6 +7,11 @@ import { Qsys } from "./qsys";
  */
 const STEPS_PER_TICK = 256;
 
+/**
+ * Wait (in milliseconds) per Node.js tick cycle
+ */
+const WAITS_PER_TICK = 0;
+
 export interface AddressSpec {
     name?: string;
     value: number;
@@ -129,7 +134,10 @@ export class Simulator {
         .then(() => {
             let run = () => {
                 return this.system.cpu.runProcessor(STEPS_PER_TICK)
-                .then((value) => {
+                .then(() => {
+                    return new Promise<void>((resolve) => setTimeout(resolve, WAITS_PER_TICK));
+                })
+                .then(() => {
                     return run();
                 });
             };
