@@ -79,9 +79,11 @@ interface AvalonSlaveLink {
 export class AvalonMaster extends Interface {
     static kind = "avalon_master";
     private _slaves: AvalonSlaveLink[];
+    private _bridges: AvalonSlaveLink[];
 
     load(ifdesc: SopcInfoInterface): void {
         this._slaves = [];
+        this._bridges = [];
         for (let blk of ifdesc.memoryBlock) {
             let slave: AvalonSlaveLink = {
                 bridge: blk.isBridge === "true",
@@ -93,7 +95,11 @@ export class AvalonMaster extends Interface {
                 link: null,
             };
             slave.end = slave.base + slave.size;
-            this._slaves.push(slave);
+            if (slave.bridge) {
+                this._bridges.push(slave);
+            } else {
+                this._slaves.push(slave);
+            }
         }
         this._slaves.sort((a, b) => a.base - b.base);
         return Interface.prototype.load.call(this, ifdesc);

@@ -18,6 +18,7 @@
                 "--empty-func=alt_busy_sleep:0",
                 "--swi-uid=12345678deadbeef",
                 "--swi-port=COM21",
+                "--swi-sid=ABCDEF-GHIJKL-MNOPQR",
                 "-vv"
             ],
             "env":{
