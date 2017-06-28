@@ -25,7 +25,7 @@ export class IpCatalog {
         let constructor = this.local[kind] || IpCatalog.global[kind];
         if ((constructor == null) && this.options.plugin) {
             try {
-                let pluginName = `nios2-sim-ip-${kind.toLowerCase()}`;
+                let pluginName = `@nios2-sim-ip/${kind.toLowerCase()}`;
                 let plugin: Nios2SimIpPlugin = require(pluginName);
                 constructor = plugin.getModuleConstructor(kind);
                 this.options.printInfo(`Plugin loaded: ${pluginName}`);
